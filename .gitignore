@@ -1,0 +1,9 @@
+Lib
+Include
+Scripts
+tcl
+*.txt
+me boy/*.env
+me boy/*.json
+me boy/__pycache__
+me boy/cogs/__pycache__
