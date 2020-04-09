@@ -1,25 +1,14 @@
 import asyncio
 import platform
-import datetime
+import time
 import arrow
 import discord
 from discord.ext import commands
 from discord.ext.commands import core
 
-class Dev(commands.Cog, name="Dev"):
+class Dev(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
-
-
-      @commands.command(name="germ")
-      @commands.guild_only()
-      async def _germ(self, ctx):
-            germ = ctx.bot.get_user(216085324906889226)
-            germstime = arrow.now("US/Pacific").strftime("%X")
-            e = discord.Embed(title=germ.name, description=f"this is germ: {germ.mention}", color=discord.Color.gold())
-            e.set_author(name=germ.name, icon_url=germ.avatar_url)
-            e.set_footer(text=f"{ctx.author.name} has asked about Germ at {germstime} PST", icon_url=ctx.author.avatar_url)
-            await ctx.send(embed=e)
 
       @commands.command(name="dm")
       @commands.guild_only()
@@ -49,7 +38,17 @@ class Dev(commands.Cog, name="Dev"):
       @commands.command(name="guilds")
       @commands.is_owner()
       async def guilds(self, ctx):
-            pass
+            all_guilds = ctx.bot.guilds
+            e = discord.Embed(color=discord.Color.blurple())
+            e.set_author(name=ctx.bot.user, icon_url=ctx.bot.user.avatar_url)
+            before = time.monotonic()
+            async with ctx.typing():
+                  for guild in all_guilds:
+                        value = f"```py\nmembers: {guild.member_count}\nShard: {guild.shard_id}\nId: {guild.id}```"
+                        e.add_field(name=guild.name, value=value)
+                  spent = round((time.monotonic() - before) * 1000)
+                  e.set_footer(text=f"{ctx.author} | {spent} ms", icon_url=ctx.author.avatar_url)
+            await ctx.send(embed=e)
 
 
 def setup(bot):
