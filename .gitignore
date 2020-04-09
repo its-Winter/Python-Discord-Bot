@@ -7,3 +7,5 @@ me boy/*.env
 me boy/*.json
 me boy/__pycache__
 me boy/cogs/__pycache__
+.vscode
+.vs

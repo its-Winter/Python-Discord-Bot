@@ -2,8 +2,7 @@ import discord
 from discord import message
 from discord.ext import commands
 from discord.ext.commands import context, errors
-from discord.ext.commands import core as check
-from enum import IntEnum
+from discord.ext.commands import core
 import contextlib
 import os, sys
 import json
