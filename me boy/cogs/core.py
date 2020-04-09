@@ -8,7 +8,7 @@ import platform
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from basefuncs import BaseFuncs
+from cogs.basefuncs import BaseFuncs
 
 class Core(commands.Cog):
       def __init__(self, bot):

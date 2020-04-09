@@ -1,7 +1,9 @@
+from discord.ext import commands
 import discord
 import arrow
 
-class BaseFuncs():
+
+class BaseFuncs(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 

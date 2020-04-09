@@ -9,6 +9,10 @@ import json
 import platform
 import asyncio
 import arrow
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 
 with open('settings.json', 'r') as j:
       settings = json.load(j)
@@ -20,7 +24,7 @@ async def on_ready():
       bot.start_time = arrow.utcnow()
       await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me on stream."))
       bot_appinfo = await bot.application_info()
-      print(
+      logging.info(
             f" \n"
             f"Discord.py:       {discord.__version__}\n"
             f"Python:           {platform.python_version()}\n"
