@@ -11,7 +11,10 @@ import asyncio
 import arrow
 import logging
 
-logging.basicConfig(level=logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
+filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
+
+corelog = logging.getLogger('Core')
 
 
 with open('settings.json', 'r') as j:
@@ -24,22 +27,23 @@ async def on_ready():
       bot.start_time = arrow.utcnow()
       await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me on stream."))
       bot_appinfo = await bot.application_info()
-      logging.info(
-            f" \n"
-            f"Discord.py:       {discord.__version__}\n"
-            f"Python:           {platform.python_version()}\n"
-            f"Connected as:     {bot.user}\n"
-            f"Prefix:           {bot.command_prefix}\n"
-            f"Owner:            {bot_appinfo.owner}\n"
+      corelog.info(
+            f"""\n
+Discord.py:       {discord.__version__}
+Python:           {platform.python_version()}
+Connected as:     {bot.user}
+Prefix:           {bot.command_prefix}
+Owner:            {bot_appinfo.owner}
+      """
       )
 
 @bot.event
 async def on_connect():
-      print(f"{bot.user} has been connected to Discord.")
+      corelog.info(f"{bot.user} has been connected to Discord.")
 
 @bot.event
 async def on_disconnect():
-      print(f"{bot.user} has been disconnected from Discord.")
+      corelog.info(f"{bot.user} has been disconnected from Discord.")
 
 @bot.event
 async def on_message(message):
@@ -47,14 +51,10 @@ async def on_message(message):
 
 @bot.event
 async def on_command(ctx):
-      msg = f"{arrow.now('US/Eastern').strftime('%x %X')} | {ctx.message.author} called {ctx.message.content}"
+      msg = f"[{arrow.now('US/Eastern').strftime('%x %X')}] {ctx.message.author} called {ctx.message.content}"
       if ctx.message.guild is None:
             msg += " in DMs"
-      print(msg)
-
-@bot.event
-async def on_error(event, *args, **kwargs):
-      await event.send("event", event, "args", args, "kwargs", kwargs)
+      corelog.info(msg)
 
 def loadallcogs():
       # loads cogs
@@ -65,16 +65,16 @@ def loadallcogs():
                         continue
                   try:
                         bot.load_extension(f"cogs.{filename}")
-                        print(f"[Cogs] Cog Loaded: {filename}")
+                        coglog.info(f"[Cogs] Cog Loaded: {filename}")
                   except Exception as e:
-                        print(f"[Cogs] Error loading cog: {filename}; Error: {e}")
+                        coglog.info(f"[Cogs] Error loading cog: {filename}; Error: {e}")
 
 class Exitcodes():
       SHUTDOWN = 0
       CRITICAL = 1
       RESTART = 26
 
-class Owner(commands.Cog, name="Owner"):
+class Owner(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
@@ -86,7 +86,7 @@ class Owner(commands.Cog, name="Owner"):
                   if not silently:
                         await ctx.send("Shutting down...")
             await ctx.bot.logout()
-            sys.exit(Exitcodes.SHUTDOWN)
+            exit(Exitcodes.SHUTDOWN)
 
       @commands.command(name="restart")
       @commands.is_owner()
@@ -95,7 +95,7 @@ class Owner(commands.Cog, name="Owner"):
                   if not silently:
                         await ctx.send("Attempting Restart...")
             await bot.logout()
-            exit(int(Exitcodes.RESTART))
+            exit(Exitcodes.RESTART)
 
       # @commands.command(name="invite")
       # @commands.is_owner()
@@ -104,12 +104,12 @@ class Owner(commands.Cog, name="Owner"):
 
 try:
       bot.add_cog(Owner(bot))
-      print("[Main] Loaded Owner commands.")
+      coglog.info("[Main] Loaded Owner commands.")
 except Exception as e:
-      print(f"[Main] Could not load Owner commands. Error: {e}")
+      coglog.info(f"[Main] Could not load Owner commands. Error: {e}")
 
 loadallcogs()
 try:
       bot.run(settings["token"])
 except KeyboardInterrupt:
-      print("How dare you..")
+      corelog.info("How dare you..")
