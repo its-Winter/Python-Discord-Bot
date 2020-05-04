@@ -35,21 +35,48 @@ class Dev(commands.Cog):
                   await ctx.send(f"Failed to send message to {user}. {e}")
 
 
-      @commands.command(name="guilds")
+      @commands.command(name="guilds", aliases=["servers"])
       @commands.is_owner()
-      async def guilds(self, ctx):
+      async def _guilds(self, ctx):
             all_guilds = ctx.bot.guilds
             e = discord.Embed(color=discord.Color.blurple())
             e.set_author(name=ctx.bot.user, icon_url=ctx.bot.user.avatar_url)
             before = time.monotonic()
             async with ctx.typing():
                   for guild in all_guilds:
-                        value = f"```py\nmembers: {guild.member_count}\nShard: {guild.shard_id}\nId: {guild.id}```"
+                        value = f"```ini\n[Members]: {guild.member_count}\n[Shard]: {guild.shard_id}\n[Id]: {guild.id}```"
                         e.add_field(name=guild.name, value=value)
                   spent = round((time.monotonic() - before) * 1000)
                   e.set_footer(text=f"{ctx.author} | {spent} ms", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=e)
 
+      @commands.command(name="dmid")
+      @commands.is_owner()
+      async def _dmid(self, ctx, id, *message):
+            if not isinstance(id, str):
+                  await ctx.send("You have not entered a valid ID")
+                  return
+            try:
+                  user = await ctx.bot.fetch_user(id)
+            except Exception as e:
+                  await ctx.send(f"Error happened while trying to fetch user.\n{e}")
+                  return
+
+            if user.bot is True:
+                  await ctx.send("I cannot send messages to bots")
+                  return
+            if not user.dm_channel:
+                  await user.create_dm()
+            
+            message = " ".join(message)
+            e = discord.Embed(description=message, color=discord.Color.blurple())
+            e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
+            e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+            try:
+                  await user.send(embed=e)
+            except Exception as e:
+                  await ctx.send(f"Error while sending embed. {e}")
+            await ctx.send(f"Message has been sent to {user}")
 
 def setup(bot):
       bot.add_cog(Dev(bot))

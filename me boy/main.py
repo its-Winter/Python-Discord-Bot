@@ -13,19 +13,52 @@ import logging
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
+handler = logging.StreamHandler(stream=sys.stdout)
 
 corelog = logging.getLogger('Core')
+coglog = logging.getLogger('Cogs')
+
+corelog.addHandler(filehandler)
+coglog.addHandler(filehandler)
 
 
 with open('settings.json', 'r') as j:
       settings = json.load(j)
+
+if settings["prefix"] is None:
+      choice = ""
+      print("There is no prefix set, what would you like to make it? One character allowed.")
+      while len(choice) != 1:
+            choice = input("> ")
+            if len(choice) != 1:
+                  print(f"'{choice}' is not a valid prefix, try again.")
+                  continue
+
+      settings["prefix"] = str(choice)
+
+      with open('settings.json', 'w') as j:
+            json.dump(settings, j, indent=6)
+
+if settings["token"] is None:
+      choice = ""
+      print("There is no token set in settings. Please give a token to use.")
+      while len(choice) < 50:
+            choice = input("> ")
+            if len(choice) < 50:
+                  print(f"Invalid token: '{choice}'")
+                  continue
+
+      settings["token"] = str(choice)
+
+      with open('settings.json', 'w') as j:
+            json.dump(settings, j, indent=6)
 
 bot = commands.AutoShardedBot(command_prefix=settings["prefix"], description="Bot", case_insensitive=True, owner_id=settings["ownerid"])
 
 @bot.event
 async def on_ready():
       bot.start_time = arrow.utcnow()
-      await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me on stream."))
+      await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
       bot_appinfo = await bot.application_info()
       corelog.info(
             f"""\n
