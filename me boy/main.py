@@ -11,15 +11,9 @@ import asyncio
 import arrow
 import logging
 
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
-filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
-handler = logging.StreamHandler(stream=sys.stdout)
-
-corelog = logging.getLogger('Core')
-coglog = logging.getLogger('Cogs')
-
-corelog.addHandler(filehandler)
-coglog.addHandler(filehandler)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
+# filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 
 
 with open('settings.json', 'r') as j:
@@ -60,7 +54,7 @@ async def on_ready():
       bot.start_time = arrow.utcnow()
       await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
       bot_appinfo = await bot.application_info()
-      corelog.info(
+      print(
             f"""\n
 Discord.py:       {discord.__version__}
 Python:           {platform.python_version()}
@@ -72,11 +66,11 @@ Owner:            {bot_appinfo.owner}
 
 @bot.event
 async def on_connect():
-      corelog.info(f"{bot.user} has been connected to Discord.")
+      print(f"{bot.user} has been connected to Discord.")
 
 @bot.event
 async def on_disconnect():
-      corelog.info(f"{bot.user} has been disconnected from Discord.")
+      print(f"{bot.user} has been disconnected from Discord.")
 
 @bot.event
 async def on_message(message):
@@ -87,7 +81,9 @@ async def on_command(ctx):
       msg = f"[{arrow.now('US/Eastern').strftime('%x %X')}] {ctx.message.author} called {ctx.message.content}"
       if ctx.message.guild is None:
             msg += " in DMs"
-      corelog.info(msg)
+      else:
+            msg += f" in {ctx.guild.name}"
+      print(msg)
 
 def loadallcogs():
       # loads cogs
@@ -98,9 +94,9 @@ def loadallcogs():
                         continue
                   try:
                         bot.load_extension(f"cogs.{filename}")
-                        coglog.info(f"[Cogs] Cog Loaded: {filename}")
+                        print(f"[Cogs] Cog Loaded: {filename}")
                   except Exception as e:
-                        coglog.info(f"[Cogs] Error loading cog: {filename}; Error: {e}")
+                        print(f"[Cogs] Error loading cog: {filename}; Error: {e}")
 
 class Exitcodes():
       SHUTDOWN = 0
@@ -137,12 +133,12 @@ class Owner(commands.Cog):
 
 try:
       bot.add_cog(Owner(bot))
-      coglog.info("[Main] Loaded Owner commands.")
+      print("[Main] Loaded Owner commands.")
 except Exception as e:
-      coglog.info(f"[Main] Could not load Owner commands. Error: {e}")
+      print(f"[Main] Could not load Owner commands. Error: {e}")
 
 loadallcogs()
 try:
       bot.run(settings["token"])
 except KeyboardInterrupt:
-      corelog.info("How dare you..")
+      print("How dare you..")

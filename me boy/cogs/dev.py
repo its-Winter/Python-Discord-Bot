@@ -12,8 +12,16 @@ class Dev(commands.Cog):
 
       @commands.command(name="dm")
       @commands.guild_only()
-      async def _dm(self, ctx, user, *message):
-            user = ctx.guild.get_member_named(user)
+      async def _dm(self, ctx, user: discord.User = None, *, message: str = None):
+            if user is None:
+                  await ctx.send("Provided no user to search for.")
+                  return
+            else:
+                  try:
+                        user = ctx.guild.get_member_named(user)
+                  except Exception as e:
+                        await ctx.send(f"Failed to fetch user: {e}")
+            
             if user is None:
                   await ctx.send(f"Failed to find that user: {user}")
                   return

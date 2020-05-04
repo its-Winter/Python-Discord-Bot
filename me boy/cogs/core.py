@@ -9,7 +9,8 @@ import logging
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from cogs.basefuncs import BaseFuncs
+from cogs.utils import BaseFuncs
+from multi_key_dict import multi_key_dict
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
@@ -20,7 +21,7 @@ class Core(commands.Cog):
 
       @commands.command(name="welcome")
       @commands.guild_only()
-      async def _welcome(self, ctx, *, user = None):
+      async def _welcome(self, ctx, *, user: discord.User = None):
             """a basic welcome command"""
             if not user:
                   await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
@@ -33,14 +34,19 @@ class Core(commands.Cog):
 
       @commands.command(name="idavatar", aliases=["idav"])
       @commands.is_owner()
-      async def _idavatar(self, ctx, userid = None):
+      async def _idavatar(self, ctx, userid: int = None):
             e = discord.Embed(color=discord.Color.blurple())
             if not userid:
                   user = ctx.author
             else:
-                  user = ctx.bot.get_user(int(userid))
+                  try:
+                        user = ctx.bot.get_user(int(userid))
+                        if user is None:
+                              raise Exception("User is None.")
+                  except Exception as e:
+                        await ctx.send(f"Failed to catch user: {e}")
             e.set_image(url=user.avatar_url)
-            e.set_author(name=f"{user.name}'s avatar", icon_url=user.avatar_url)
+            e.set_author(name=f"{user.name}'s avatar", icon_url=user.avatar_url, url=user.avatar_url)
             e.set_footer(text=f"{ctx.author.name} wanted to see.", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=e)
 
@@ -70,15 +76,6 @@ class Core(commands.Cog):
             else:
                   await ctx.send("Channel is not set to NSFW.")
 
-      @commands.command(name="game")
-      @commands.is_owner()
-      async def _game(self, ctx, *, game):
-            """Set's bot's playing status"""
-            text = discord.Game(name=game)
-            status = discord.Status.online
-            await ctx.bot.change_presence(activity=text, status=status)
-            await ctx.send(f"Set game to '{text}'")
-
       @commands.command(name="ping")
       async def _ping(self, ctx):
             """Ping pong."""
@@ -107,7 +104,7 @@ class Core(commands.Cog):
                   try:
                         ctx.bot.reload_extension(f"cogs.{cog.lower()}")
                         await ctx.send(f"[Cogs] Reloaded {cog}")
-                        corelog.log(msg=f"[Cogs] Reloaded {cog}", level=logging.INFO)
+                        print(f"[Cogs] Reloaded {cog}")
                   except Exception as e:
                         await ctx.send(f"[Cogs] Failed to reload {cog}\nError: {e}")
 
@@ -123,7 +120,7 @@ class Core(commands.Cog):
                         try:
                               ctx.bot.load_extension(f"cogs.{cog.lower()}")
                               await ctx.send(f"[Cogs] Loaded {cog}")
-                              corelog.log(msg=f"[Cogs] Loaded {cog}")
+                              print(f"[Cogs] Loaded {cog}")
                         except Exception as e:
                               await ctx.send(f"[Cogs] Failed to load {cog}\nError: {e}")
 
@@ -156,6 +153,40 @@ class Core(commands.Cog):
             e.add_field(name="Channel", value=channel)
             e.add_field(name="Inviter", value=inviter)
             await waiting.edit(content=None, embed=e)
+
+      @commands.group(name="set")
+      @commands.is_owner()
+      async def _set(self, ctx):
+            if ctx.invoked_subcommand is None:
+                  await ctx.send("No subcommand was given.")
+
+      @_set.command(name="token")
+      async def _token(self, ctx, token: int = None):
+            await ctx.send("Works!")
+
+      @_set.command(name="status")
+      async def _status(self, ctx, status: str = None):
+            """Set's bot's status"""
+            statuses = {
+                  "online": [discord.Status.online, "Online"],
+                  "idle": [discord.Status.idle, "Idle"],
+                  "dnd": [discord.Status.dnd, "Dnd"],
+                  "offline": [discord.Status.offline, "Offline"]
+            }
+
+            if status in statuses:
+                  chosenstatus = statuses.get(status)
+                  return await ctx.send(f"Selected `{chosenstatus[1]}`")
+            
+            elif status is None:
+                  return await ctx.send("Nothing set.")
+
+            status = chosenstatus[0]
+            try:
+                  await ctx.bot.change_presence(status=status)
+            except Exception as e:
+                  await ctx.send(f"Failed to set game status. {e}")
+            await ctx.send(f"Set status to `{chosenstatus[1]}`")
 
 
 def setup(bot):
