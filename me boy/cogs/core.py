@@ -26,10 +26,7 @@ class Core(commands.Cog):
             if not users:
                   await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
-                  if len(tuple(users)) > 1:
-                        users = ", ".join(users.mention)
-                  else:
-                        users = users.mention
+                  users = ", ".join(users.mention) if users > 1 else users.mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
 
       @commands.command(name="idavatar", aliases=["idav"])
