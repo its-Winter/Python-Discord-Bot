@@ -52,7 +52,7 @@ bot = commands.AutoShardedBot(command_prefix=settings["prefix"], description="Bo
 @bot.event
 async def on_ready():
       bot.start_time = arrow.utcnow()
-      await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
+      # await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
       bot_appinfo = await bot.application_info()
       print(
             f"""\n

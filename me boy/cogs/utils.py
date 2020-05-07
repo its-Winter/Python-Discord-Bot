@@ -1,11 +1,11 @@
 from discord.ext import commands
 import arrow
 
-class BaseFuncs(commands.Cog):
+class utils(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
-      def botuptime(self):
+      def botuptime(self) -> str:
             uptime = arrow.utcnow() - self.bot.start_time
             totalseconds = uptime.total_seconds()
             seconds = int(totalseconds)
@@ -29,4 +29,4 @@ class BaseFuncs(commands.Cog):
             return uptimestr
 
 def setup(bot):
-      bot.add_cog(BaseFuncs(bot))
+      bot.add_cog(utils(bot))
