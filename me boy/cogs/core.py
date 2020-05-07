@@ -2,6 +2,7 @@ import sys
 import arrow
 import time
 import asyncio
+import aiohttp
 import discord
 import contextlib
 import platform
@@ -9,8 +10,7 @@ import logging
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from cogs.utils import BaseFuncs
-from multi_key_dict import multi_key_dict
+from cogs.utils import utils
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
@@ -21,15 +21,15 @@ class Core(commands.Cog):
 
       @commands.command(name="welcome")
       @commands.guild_only()
-      async def _welcome(self, ctx, *, user: discord.User = None):
+      async def _welcome(self, ctx, *, users: discord.User = None):
             """a basic welcome command"""
-            if not user:
+            if not users:
                   await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
-                  if len(user) > 1:
-                        users = ", ".join(user.mention)
+                  if len(tuple(users)) > 1:
+                        users = ", ".join(users.mention)
                   else:
-                        users = user.mention
+                        users = users.mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
 
       @commands.command(name="idavatar", aliases=["idav"])
@@ -40,7 +40,7 @@ class Core(commands.Cog):
                   user = ctx.author
             else:
                   try:
-                        user = ctx.bot.get_user(int(userid))
+                        user = await ctx.bot.fetch_user(int(userid))
                         if user is None:
                               raise Exception("User is None.")
                   except Exception as e:
@@ -63,12 +63,13 @@ class Core(commands.Cog):
       @commands.command(name="uptime")
       async def _uptime(self, ctx):
             async with ctx.typing():
-                  uptimestr = BaseFuncs.botuptime(self)
-                  e = discord.Embed(title="Uptime", description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green())
+                  uptimestr = utils.botuptime(self)
+                  e = discord.Embed(description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green())
+                  e.set_author(name="Uptime", icon_url=ctx.bot.user.avatar_url)
                   e.set_footer(text=f"summoned by {ctx.author}", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=e)
 
-      @commands.command(name='nsfwcheck')
+      @commands.command(name="nsfwcheck")
       @commands.guild_only()
       async def _checknsfw(self, ctx):
             if ctx.channel.nsfw:
@@ -103,10 +104,10 @@ class Core(commands.Cog):
             for cog in cogs:
                   try:
                         ctx.bot.reload_extension(f"cogs.{cog.lower()}")
-                        await ctx.send(f"[Cogs] Reloaded {cog}")
-                        print(f"[Cogs] Reloaded {cog}")
+                        await ctx.send(f"Reloaded: {cog}")
+                        print(f"Reloaded: {cog}")
                   except Exception as e:
-                        await ctx.send(f"[Cogs] Failed to reload {cog}\nError: {e}")
+                        await ctx.send(f"Failed to reload: {cog}\n{e}")
 
 
       @commands.command(name="load")
@@ -119,10 +120,10 @@ class Core(commands.Cog):
                   for cog in cogs:
                         try:
                               ctx.bot.load_extension(f"cogs.{cog.lower()}")
-                              await ctx.send(f"[Cogs] Loaded {cog}")
-                              print(f"[Cogs] Loaded {cog}")
+                              await ctx.send(f"Loaded: {cog}")
+                              print(f"Loaded: {cog}")
                         except Exception as e:
-                              await ctx.send(f"[Cogs] Failed to load {cog}\nError: {e}")
+                              await ctx.send(f"Failed to load: {cog}\n{e}")
 
       @commands.command(name="guildinfo", aliases=["ginfo", "sinfo", "serverinfo"])
       @commands.guild_only()
@@ -161,8 +162,49 @@ class Core(commands.Cog):
                   await ctx.send("No subcommand was given.")
 
       @_set.command(name="token")
-      async def _token(self, ctx, token: int = None):
+      async def _token(self, ctx, token: str = None):
             await ctx.send("Works!")
+
+      @_set.command(name="avatar", aliases=["av"])
+      async def _avatar(self, ctx, url: str = None):
+            if len(ctx.message.attachments) > 0:
+                  data = await ctx.message.attachments[0].read()
+            elif url is not None:
+                  if url.startswith("<") and url.endswith(">"):
+                        url = url[1:-1]
+
+                  async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as r:
+                              data = await r.read()
+            else:
+                  return await ctx.send("Nothing changed.")
+            try:
+                  async with ctx.typing():
+                        await ctx.bot.user.edit(avatar=data)
+            except discord.HTTPException:
+                  await ctx.send(
+                        "Failed. Remember that you can edit the avatar "
+                        "up to two times a hour. The URL or attachment "
+                        "must be a valid image in either JPG or PNG format."
+                  )
+            except discord.InvalidArgument:
+                  await ctx.send("JPG / PNG format only.")
+            else:
+                  await ctx.send("Avatar set.")
+
+      @_set.command(name="nickname", aliases=["nick"])
+      @commands.guild_only()
+      async def _nickname(self, ctx, *, nick: str = None):
+            if not nick:
+                  nick = None
+                  msg = f"Nickname Cleared."
+            else:
+                  msg = f"Nickname set to `{nick}.`"
+            try:
+                  await ctx.guild.me.edit(nick=nick)
+                  return await ctx.send(msg)
+            except discord.Forbidden:
+                  return await ctx.send("I lack the permission to change my nickname.")
 
       @_set.command(name="status")
       async def _status(self, ctx, status: str = None):
@@ -171,22 +213,84 @@ class Core(commands.Cog):
                   "online": [discord.Status.online, "Online"],
                   "idle": [discord.Status.idle, "Idle"],
                   "dnd": [discord.Status.dnd, "Dnd"],
-                  "offline": [discord.Status.offline, "Offline"]
+                  "invisible": [discord.Status.invisible, "Invisible"],
+                  "offline": [discord.Status.invisible, "Invisible"]
             }
-
             if status in statuses:
-                  chosenstatus = statuses.get(status)
-                  return await ctx.send(f"Selected `{chosenstatus[1]}`")
-            
+                  chosenstatus = statuses.get(status.lower())
             elif status is None:
                   return await ctx.send("Nothing set.")
-
+            else:
+                  return await ctx.send(f"Invalid status: `{status}`")
             status = chosenstatus[0]
+            game = ctx.bot.guilds[0].me.activity if len(ctx.bot.guilds) > 0 else None
             try:
-                  await ctx.bot.change_presence(status=status)
+                  await ctx.bot.change_presence(status=status, activity=game)
             except Exception as e:
-                  await ctx.send(f"Failed to set game status. {e}")
+                  await ctx.send(f"Failed to set status. {e}")
             await ctx.send(f"Set status to `{chosenstatus[1]}`")
+
+      @_set.command(name="playing", aliases=["game"])
+      async def _playing(self, ctx, *, game: str = None):
+            if game:
+                  if len(game) > 128:
+                        return await ctx.send("Exceeded maximum length of 128 characters.")
+
+                  game = discord.Game(name=game)
+            else:
+                  game = None
+            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+            await ctx.bot.change_presence(status=status, activity=game)
+            if game:
+                  return await ctx.send(f"Status set to ``Playing {game.name}``")
+            else:
+                  return await ctx.send("Game cleared.")
+
+      @_set.command(name="listening")
+      async def _listening(self, ctx, *, listening: str = None):
+            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+            if listening:
+                  activity = discord.Activity(name=listening, type=discord.ActivityType.listening)
+            else:
+                  activity = None
+            await ctx.bot.change_presence(status=status, activity=activity)
+            if listening:
+                  return await ctx.send(f"Status set to ``Listening to {listening}``")
+            else:
+                  return await ctx.send("Listening cleared.")
+
+      @_set.command(name="streaming", aliases=["stream"])
+      async def _streaming(self, ctx, streamer: str = None, *, stream_title: str = None):
+            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else None
+            if stream_title:
+                  stream_title = stream_title.strip()
+                  if "twitch.tv/" not in streamer:
+                        streamer = "https://twitch.tv/" + streamer
+                  activity = discord.Streaming(url=streamer, name=stream_title)
+                  await ctx.bot.change_presence(status=status, activity=activity)
+            elif streamer is not None:
+                  return await ctx.send(f"Failed to provide a stream title.")
+            else:
+                  await ctx.bot.change_presence(activity=None, status=status)
+
+            if stream_title:
+                  return await ctx.send(f"Status set to ``Streaming {stream_title}``")
+            else:
+                  return await ctx.send("Status cleared.")
+
+      @_set.command(name="watching")
+      async def _watching(self, ctx, *, watching: str = None):
+            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+            if watching:
+                  activity = discord.Activity(name=watching, type=discord.ActivityType.watching)
+            else:
+                  activity = None
+            await ctx.bot.change_presence(status=status, activity=activity)
+            if watching:
+                  return await ctx.send(f"Status set to ``Watching {watching}``")
+            else:
+                  return await ctx.send("Watching cleared.")
+
 
 
 def setup(bot):
