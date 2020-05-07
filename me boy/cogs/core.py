@@ -10,7 +10,6 @@ from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
 from cogs.utils import BaseFuncs
-from multi_key_dict import multi_key_dict
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
