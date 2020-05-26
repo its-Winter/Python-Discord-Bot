@@ -7,7 +7,7 @@ class Audio(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
-      @commands.command(name="join", aliases=["connect", "summon"])
+      @commands.command(name="join", aliases=["connect", "summon"], hidden=True)
       async def _join(self, ctx):
             if ctx.author.voice.channel is None:
                   return await ctx.send("You're not connected to a voice channel yet!")
