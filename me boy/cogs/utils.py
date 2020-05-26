@@ -1,6 +1,8 @@
 from discord.ext import commands
 from collections.abc import Iterable
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, Optional, Union, SupportsInt
+from babel.numbers import format_decimal
+import datetime
 import arrow
 import itertools
 
@@ -34,7 +36,7 @@ def botuptime(bot) -> str:
                         continue
                   unit = plural_period_name if period_value > 1 else period_name
                   strings.append(f"{period_value} {unit}")
-      uptimestr = ", ".join(strings)
+      uptimestr = humanize_list(strings)
       return uptimestr
 
 def italicize(text: str) -> str:
@@ -112,3 +114,34 @@ def humanize_list(items: Sequence[str]) -> str:
             return ", ".join(items[:-1]) + ", and " + items[-1]
       except IndexError:
             return None
+
+def humanize_timedelta(
+      *, timedelta: Optional[datetime.timedelta] = None, seconds: Optional[SupportsInt] = None
+      ) -> str:
+      try:
+            obj = seconds if seconds is not None else timedelta.total_seconds()
+      except AttributeError:
+            raise ValueError("You must provide either a timedelta or a number of seconds")
+
+      seconds = int(obj)
+      periods = [
+            ("year", "years", 60 * 60 * 24 * 365),
+            ("month", "months", 60 * 60 * 24 * 30),
+            ("day", "days", 60 * 60 * 24),
+            ("hour", "hours", 60 * 60),
+            ("minute", "minutes", 60),
+            ("second", "seconds", 1),
+      ]
+      strings = []
+      for period_name, plural_period_name, period_seconds in periods:
+            if seconds >= period_seconds:
+                  period_value, seconds = divmod(seconds, period_seconds)
+                  if period_value == 0:
+                        continue
+                  unit = plural_period_name if period_value > 1 else period_name
+                  strings.append(f"{period_value} {unit}")
+      
+      return humanize_list(strings)
+
+def humanize_number(val: Union[int, float]) -> str:
+      return format_decimal(val, locale="en_US")
