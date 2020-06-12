@@ -1,7 +1,13 @@
 import discord
 import aiohttp
 import asyncio
+import sqlite3
 from discord.ext import commands
+from typing import (
+      Optional,
+      Union,
+      Sequence
+)
 
 class Set(commands.Cog):
 
@@ -51,7 +57,7 @@ class Set(commands.Cog):
                   nick = None
                   msg = f"Nickname Cleared."
             else:
-                  msg = f"Nickname set to `{nick}.`"
+                  msg = f"Nickname set to `{nick}`."
             try:
                   await ctx.guild.me.edit(nick=nick)
                   return await ctx.send(msg)
@@ -160,8 +166,30 @@ class Set(commands.Cog):
                   await ctx.send(f"Error: {e}")
 
       @commands.command(name="copystatus", aliases=["cpstatus"], hidden=True)
-      async def _copy_status(self, ctx, person_to_copy: str = None):
+      async def _copy_status(self, ctx, person_to_copy: Optional[Union[discord.User, str]] = None):
+            if not person_to_copy:
+                  return await ctx.send("Nobody to copy.")
+            if isinstance(person_to_copy, discord.User):
+                  user = ctx.guild.get_member(user.id)
             pass
+            
+
+      @_set.command(name="sql")
+      @commands.is_owner()
+      async def _sql(self, ctx, tablename: str = None):
+            connection = sqlite3.connect('members.db')
+            cursor = sqlite3.Cursor(connection)
+            cursor.execute(f"""CREATE TABLE {tablename} (id INTEGER PRIMARY KEY, name TEXT)""")
+
+            await ctx.send(f"Ran the follwing SQL: `CREATE TABLE {tablename} (id INTEGER PRIMARY KEY, name TEXT)`")
+            try:
+                  connection.commit()
+                  connection.close()
+                  return await ctx.send("Committed and closed connection successfully.")
+            except Exception as e:
+                  return await ctx.send(f"The following occurred: {e}")
+            
+
 
 def setup(bot):
       bot.add_cog(Set(bot))

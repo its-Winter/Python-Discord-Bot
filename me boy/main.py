@@ -132,7 +132,7 @@ class Owner(commands.Cog):
             await ctx.bot.logout()
             exit(Exitcodes.SHUTDOWN)
 
-      @commands.command(name="restart")
+      @commands.command(name="restart", aliases=["rs"])
       @commands.is_owner()
       async def _restart(self, ctx, silently = False):
             """Attempts a bot restart."""
@@ -156,10 +156,10 @@ class Owner(commands.Cog):
                         reloaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            if len(reloaded_cogs) > 0:
+            if reloaded_cogs is not None and len(reloaded_cogs) > 0:
                   reloaded_cogs = humanize_list(reloaded_cogs)
                   await ctx.send(f"Reloaded: {reloaded_cogs}")
-            if len(errors) > 0:
+            if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
 
       @commands.command(name="load")
@@ -177,10 +177,10 @@ class Owner(commands.Cog):
                   except Exception as e:
                         errors.append(e)
             loaded_cogs = humanize_list(loaded_cogs)
-            if len(loaded_cogs) > 0:
+            if loaded_cogs is not None and len(loaded_cogs) > 0:
                   await ctx.send(f"Loaded: {loaded_cogs}")
-            if len(errors) > 0:
-                  await ctx.send("Errors: {}".format("\n".join(errors)))
+            if errors is not None and len(errors) > 0:
+                  await ctx.send("Errors: {}".format(errors))
 
       @commands.command(name="unload")
       @commands.is_owner()
@@ -197,9 +197,9 @@ class Owner(commands.Cog):
                   except Exception as e:
                         errors.append(e)
             unloaded_cogs = humanize_list(unloaded_cogs)
-            if len(unloaded_cogs) > 0:
+            if unloaded_cogs is not None and len(unloaded_cogs) > 0:
                   await ctx.send(f"Unloaded: {unloaded_cogs}")
-            if len(errors) > 0:
+            if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
 
 try:

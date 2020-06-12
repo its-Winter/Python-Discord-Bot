@@ -2,10 +2,15 @@ from discord.ext import commands
 from collections.abc import Iterable
 from typing import List, Sequence, Tuple, Optional, Union, SupportsInt
 from babel.numbers import format_decimal
+from random import randint
+import discord
 import datetime
 import arrow
 import itertools
 
+def randomize_colour(embed: discord.Embed) -> discord.Embed:
+      embed.colour = discord.Color(value=randint(0x000000, 0xFFFFFF))
+      return embed
 
 def is_allowed(*ids: int):
       def predicate(ctx):
@@ -105,7 +110,6 @@ def bordered(*columns, ascii_border: bool = False) -> str:
       lines.append(sep.join(final_row))
 
       return "\n".join(lines).format(**borders)
-
 
 def humanize_list(items: Sequence[str]) -> str:
       if len(items) == 1:

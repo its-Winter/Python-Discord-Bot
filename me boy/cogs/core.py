@@ -7,6 +7,8 @@ import discord
 import contextlib
 import platform
 import logging
+from typing import Union, Optional, List
+from datetime import datetime
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
@@ -26,12 +28,22 @@ class Core(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
+      @commands.command(name="headpat", hidden=True)
+      @commands.bot_has_guild_permissions(embed_links=True)
+      async def _headpat(self, ctx: commands.Context):
+            color = discord.Colour.from_rgb(254, 222, 214)
+            time = arrow.now(tz='US/Eastern')
+            e = discord.Embed(color=color, title=f"{ctx.author.name} headpat now!")
+            e.set_image(url="https://cdn.discordapp.com/attachments/461381136661217283/711845948455780402/headpat_her.png")
+            e.set_footer(text=f"{time.strftime('%H:%M')} EST · {time.strftime('%I:%M')} EST")
+            await ctx.send(embed=e)
+
       @commands.command(name="welcome")
       @commands.guild_only()
-      async def _welcome(self, ctx, *, users: discord.User = None):
+      async def _welcome(self, ctx, *, users: Optional[Union[List[discord.User], List[str]]] = None):
             """A basic welcome command"""
             if not users:
-                  await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
+                  return await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
                   if len(users) > 1:
                         users = humanize_list(users)
@@ -39,23 +51,38 @@ class Core(commands.Cog):
                         users = users[0].mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
 
-      @commands.command(name="idavatar", aliases=["idav"])
-      @commands.is_owner()
-      async def _idavatar(self, ctx, userid: int = None):
-            """Show any user id's avatar."""
-            e = discord.Embed(color=discord.Color.blurple())
-            if not userid:
-                  user = ctx.author
+      @commands.command(name="avatar", aliases=["av"])
+      @commands.bot_has_guild_permissions(embed_links=True)
+      async def _avatar(self, ctx, user: Optional[Union[discord.User, str, int]] = None):
+            """Show any user's avatar."""
+            if not user:
+                  userav = ctx.author
+            elif isinstance(user, discord.User):
+                  userav = user
+            elif not isinstance(user, int):
+                  userav = ctx.guild.get_member_named(user)
             else:
-                  try:
-                        user = await ctx.bot.fetch_user(int(userid))
-                        if user is None:
-                              raise Exception("User is None.")
-                  except Exception as e:
-                        await ctx.send(f"Failed to catch user: {e}")
-            e.set_image(url=user.avatar_url)
-            e.set_author(name=f"{user.name}'s avatar", icon_url=user.avatar_url, url=user.avatar_url)
-            e.set_footer(text=f"{ctx.author.name} wanted to see.", icon_url=ctx.author.avatar_url)
+                  userav = ctx.guild.get_member(user) 
+                  if userav is None:
+                        userav = await ctx.bot.fetch_user(user)
+
+            if userav:
+                  if userav not in ctx.guild.members:
+                        return await ctx.send(f"Sorry, {userav.name} is not apart of this guild.")
+            else:
+                  await ctx.send(userav)
+                  return await ctx.send(f"Could not find: {inline(str(user))}")
+            
+            if userav.is_avatar_animated():
+                  link = userav.avatar_url_as(format='gif', size=1024)
+            else:
+                  link = userav.avatar_url_as(format='png', size=1024)
+
+            e = discord.Embed(color=ctx.guild.get_member(userav.id).top_role.color)
+            e.set_image(url=link)
+            e.set_author(name=f"{userav.name}'s avatar", icon_url=link, url=link)
+            footer = f"{ctx.author.name} wanted to see." if userav != ctx.author else "So you wanted to see yourself, eh?"
+            e.set_footer(text=footer, icon_url=ctx.author.avatar_url if userav.id != ctx.author.id else "")
             await ctx.send(embed=e)
 
       @commands.command(name="germ")
@@ -217,7 +244,7 @@ class Core(commands.Cog):
       @commands.is_owner()
       async def _dmid(self, ctx, id: int, *, message: str = None):
             """Direct message any user id with a message."""
-            if not isinstance(id, str):
+            if not isinstance(id, int):
                   return await ctx.send("You have not entered a valid ID")
 
             if not message:
@@ -242,7 +269,7 @@ class Core(commands.Cog):
                   await user.send(embed=e)
                   return await ctx.send(f"Message has been sent to `{user}`!")
             except discord.Forbidden:
-                  return await ctx.send("Cannot send messages to this user")
+                  return await ctx.send(f"Cannot send messages to {user.name}")
             except discord.HTTPException:
                   return await ctx.send("Message failed.")
             except Exception as e:
@@ -395,7 +422,7 @@ class Core(commands.Cog):
                   )
                   data = discord.Embed(
                         description=(f"{guild.description}\n\n" if guild.description else "") + created_at,
-                        colour=ctx.guild.me.top_role.color,
+                        colour=discord.Colour.random(),
                   )
                   data.set_author(
                         name=guild.name,
@@ -461,6 +488,113 @@ class Core(commands.Cog):
                   if guild.splash:
                         data.set_image(url=guild.splash_url_as(format="png"))
                         data.set_footer(text=joined_on)
+
+            await ctx.send(embed=data)
+      
+      
+      @commands.command(name="userinfo", aliases=["uinfo"])
+      @commands.guild_only()
+      @commands.bot_has_permissions(embed_links=True)
+      async def userinfo(self, ctx, *, user: discord.Member = None):
+            """Show information about a user.
+            This includes fields for status, discord join date, server
+            join date, voice state and previous names/nicknames.
+            If the user has no roles, previous names or previous nicknames,
+            these fields will be omitted.
+            """
+            author = ctx.author
+            guild = ctx.guild
+
+            if not user:
+                user = author
+
+            #  A special case for a special someone :^)
+            special_date = datetime(2016, 1, 10, 6, 8, 4, 443000)
+            is_special = user.id == 96130341705637888 and guild.id == 133049272517001216
+
+            roles = user.roles[-1:0:-1]
+
+            joined_at = user.joined_at if not is_special else special_date
+            since_created = (ctx.message.created_at - user.created_at).days
+            if joined_at is not None:
+                  since_joined = (ctx.message.created_at - joined_at).days
+                  user_joined = joined_at.strftime("%d %b %Y %H:%M")
+            else:
+                  since_joined = "?"
+                  user_joined = "Unknown"
+            user_created = user.created_at.strftime("%d %b %Y %H:%M")
+            voice_state = user.voice
+            member_number = (
+                  sorted(guild.members, key=lambda m: m.joined_at or ctx.message.created_at).index(user)
+                  + 1
+            )
+
+            created_on = "{}\n({} days ago)".format(user_created, since_created)
+            joined_on = "{}\n({} days ago)".format(user_joined, since_joined)
+
+            if any(a.type is discord.ActivityType.streaming for a in user.activities):
+                  statusemoji = "\N{LARGE PURPLE CIRCLE}"
+            elif user.status.name == "online":
+                  statusemoji = "\N{LARGE GREEN CIRCLE}"
+            elif user.status.name == "offline":
+                  statusemoji = "\N{MEDIUM WHITE CIRCLE}"
+            elif user.status.name == "dnd":
+                  statusemoji = "\N{LARGE RED CIRCLE}"
+            elif user.status.name == "idle":
+                  statusemoji = "\N{LARGE ORANGE CIRCLE}"
+            activity = "Chilling in {} status".format(user.status)
+            status_string = self.get_status_string(user)
+
+            if roles:
+
+                  role_str = ", ".join([x.mention for x in roles])
+                  # 400 BAD REQUEST (error code: 50035): Invalid Form Body
+                  # In embed.fields.2.value: Must be 1024 or fewer in length.
+                  if len(role_str) > 1024:
+                        # Alternative string building time.
+                        # This is not the most optimal, but if you're hitting this, you are losing more time
+                        # to every single check running on users than the occasional user info invoke
+                        # We don't start by building this way, since the number of times we hit this should be
+                        # infintesimally small compared to when we don't across all uses of Red.
+                        continuation_string = "and {numeric_number} more roles not displayed due to embed limits."
+                        
+                        available_length = 1024 - len(continuation_string)  # do not attempt to tweak, i18n
+
+                        role_chunks = []
+                        remaining_roles = 0
+
+                        for r in roles:
+                              chunk = f"{r.mention}, "
+                              chunk_size = len(chunk)
+
+                              if chunk_size < available_length:
+                                    available_length -= chunk_size
+                                    role_chunks.append(chunk)
+                              else:
+                                    remaining_roles += 1
+
+                        role_chunks.append(continuation_string.format(numeric_number=remaining_roles))
+
+                        role_str = "".join(role_chunks)
+
+            else:
+                  role_str = None
+
+            data = discord.Embed(description=status_string or activity, colour=user.colour)
+
+            data.add_field(name="Joined Discord on", value=created_on)
+            data.add_field(name="Joined this server on", value=joined_on)
+            if role_str is not None:
+                  data.add_field(name="Roles", value=role_str, inline=False)
+            data.set_footer(text="Member #{} | User ID: {}".format(member_number, user.id))
+
+            name = str(user)
+            name = " ~ ".join((name, user.nick)) if user.nick else name
+            name = filter_invites(name)
+
+            avatar = user.avatar_url_as(static_format="png")
+            data.set_author(name=f"{statusemoji} {name}", url=avatar)
+            data.set_thumbnail(url=avatar)
 
             await ctx.send(embed=data)
 

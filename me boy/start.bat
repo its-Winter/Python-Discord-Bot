@@ -1,5 +1,5 @@
 @echo off
-call "%USERPROFILE%\Documents\Phoenix\Scripts\activate.bat"
+:: call "%USERPROFILE%\Documents\Phoenix\Scripts\activate.bat"
 :start
 python main.py
 
