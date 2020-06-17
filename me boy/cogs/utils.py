@@ -3,10 +3,17 @@ from collections.abc import Iterable
 from typing import List, Sequence, Tuple, Optional, Union, SupportsInt
 from babel.numbers import format_decimal
 from random import randint
+from urllib.parse import quote
 import discord
 import datetime
 import arrow
 import itertools
+import aiohttp
+
+_headers = {
+      'User-Agent': 'Discord Bot (https://github.com/its-Winter/Python-Discord-Bot)',
+      'Content-Type': 'application/x-www-form-urlencoded'
+}
 
 def randomize_colour(embed: discord.Embed) -> discord.Embed:
       embed.colour = discord.Color(value=randint(0x000000, 0xFFFFFF))
@@ -149,3 +156,32 @@ def humanize_timedelta(
 
 def humanize_number(val: Union[int, float]) -> str:
       return format_decimal(val, locale="en_US")
+
+def pagify(text: str, limit: int = 2000):
+      """ Slices text into chunks to make it manageable """
+      lines = text.split('\n')
+      pages = []
+
+      chunk = ''
+      for line in lines:
+            if len(chunk) + len(line) > limit and len(chunk) > 0:
+                  pages.append(chunk)
+                  chunk = ''
+
+            if len(line) > limit:
+                  _lchunks = len(line) / limit
+                  for _lchunk in range(_lchunks):
+                        s = limit * _lchunk
+                        e = s + limit
+                        pages.append(line[s:e])
+            else:
+                  chunk += line + '\n'
+
+      if chunk:
+            pages.append(chunk)
+
+      return pages
+
+async def hastepaste(content: str):
+      async with aiohttp.request('POST', 'https://hastepaste.com/api/create', data=f'raw=false&text={quote(content)}', headers=_headers) as res:
+            return await res.text() if res.status >= 200 and res.status < 400 else None

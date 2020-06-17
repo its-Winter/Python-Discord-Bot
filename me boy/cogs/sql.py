@@ -12,7 +12,17 @@ class Config(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
+      def get_config(self, table: str, id: int) -> list:
+            sql = f"""SELECT * FROM {table} WHERE user_id={id}"""
+            with sqlite3.connect('main.db') as db:
+                  cursor = db.cursor()
+                  cursor.execute(sql)
+                  results = cursor.fetchall()
+            
+            return results
+
       @commands.group(name="config")
+      @commands.is_owner()
       async def _config(self, ctx):
             """Configuration... and stuff."""
             if ctx.invoked_subcommand is None:
@@ -45,6 +55,12 @@ class Config(commands.Cog):
                   cursor.execute(check_table)
                   cursor.execute(insert_statement, values)
                   db.commit()
+            
+            await ctx.message.add_reaction('✅')
+
+      @_config.command(name="get")
+      async def _get_config(self, ctx, id: int):
+            await ctx.send(self.get_config('fetched_users', id))
 
 def setup(bot):
       bot.add_cog(Config(bot))

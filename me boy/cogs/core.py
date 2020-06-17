@@ -7,6 +7,8 @@ import discord
 import contextlib
 import platform
 import logging
+import re
+from random import choice
 from typing import Union, Optional, List
 from datetime import datetime
 from discord import utils
@@ -597,6 +599,25 @@ class Core(commands.Cog):
             data.set_thumbnail(url=avatar)
 
             await ctx.send(embed=data)
+
+      @commands.command(name="uwu", aliases=["owo"])
+      async def _owoify(self, ctx, *, s: str):
+            faces = ["(・`ω´・)", "OwO", "owo", "oωo", "òωó", "°ω°", "UwU", ">w<", "^w^"]
+            face = choice(faces)
+            patterns = [
+                  (r"(?:r|l)", "w"),
+                  (r"(?:R|L)", "W"),
+                  (r"n([aeiou])", r"ny\1"),
+                  (r"N([aeiou])", r"Ny\1"),
+                  (r"N([AEIOU])", r"NY\1"),
+                  (r"ove", "uv"),
+                  (r"!+", face),
+            ]
+
+            for pattern, replacement in patterns:
+                  s = re.sub(pattern, replacement, s)
+
+            await ctx.send(s)
 
 def setup(bot):
       bot.add_cog(Core(bot))

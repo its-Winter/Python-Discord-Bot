@@ -60,6 +60,7 @@ async def on_ready():
       bot.start_time = arrow.utcnow()
       # await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
       bot_appinfo = await bot.application_info()
+      bot.invite_url = discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(permissions=8))
       print(
             f"""\n
 Discord.py:       {discord.__version__}
