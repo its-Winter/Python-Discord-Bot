@@ -20,7 +20,8 @@ from cogs.utils import (
       box,
       bordered,
       inline,
-      humanize_list
+      humanize_list,
+      pagify
 )
 
 corelog = logging.getLogger('Core')
@@ -40,7 +41,7 @@ class Core(commands.Cog):
             e.set_footer(text=f"{time.strftime('%H:%M')} EST · {time.strftime('%I:%M')} EST")
             await ctx.send(embed=e)
 
-      @commands.command(name="welcome")
+      @commands.command(name="welcome", hidden=True)
       @commands.guild_only()
       async def _welcome(self, ctx, *, users: Optional[Union[List[discord.User], List[str]]] = None):
             """A basic welcome command"""
@@ -52,6 +53,22 @@ class Core(commands.Cog):
                   else:
                         users = users[0].mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
+
+      @commands.command()
+      @commands.is_owner()
+      async def traceback(self, ctx: commands.Context, public: bool = False):
+            """Sends to the owner the last command exception that has occurred
+            If public (yes is specified), it will be sent to the chat instead"""
+            if not public:
+                  destination = ctx.author
+            else:
+                  destination = ctx.channel
+
+            if self.bot._last_exception:
+                  for page in pagify(self.bot._last_exception):
+                        await destination.send(box(page, lang="py"))
+            else:
+                  await ctx.send("No exception has occurred yet")
 
       @commands.command(name="avatar", aliases=["av"])
       @commands.bot_has_guild_permissions(embed_links=True)

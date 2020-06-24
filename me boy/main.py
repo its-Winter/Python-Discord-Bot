@@ -10,6 +10,7 @@ import platform
 import asyncio
 import arrow
 import logging
+from enum import IntEnum
 
 from cogs.utils import (
       humanize_list,
@@ -61,6 +62,7 @@ async def on_ready():
       # await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
       bot_appinfo = await bot.application_info()
       bot.invite_url = discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(permissions=8))
+      bot._last_exception = None
       print(
             f"""\n
 Discord.py:       {discord.__version__}
@@ -114,10 +116,10 @@ def loadallcogs():
       if len(errors) > 0:
             print(f"Errors: {errors}")
 
-class Exitcodes:
-      SHUTDOWN = 0
-      CRITICAL = 1
-      RESTART = 26
+class ExitCodes(IntEnum):
+    CRITICAL = 1
+    SHUTDOWN = 0
+    RESTART = 26
 
 class Owner(commands.Cog):
       def __init__(self, bot):
@@ -131,7 +133,7 @@ class Owner(commands.Cog):
                   if not silently:
                         await ctx.send("Shutting down...")
             await ctx.bot.logout()
-            exit(Exitcodes.SHUTDOWN)
+            sys.exit(ExitCodes.SHUTDOWN)
 
       @commands.command(name="restart", aliases=["rs"])
       @commands.is_owner()
@@ -141,7 +143,7 @@ class Owner(commands.Cog):
                   if not silently:
                         await ctx.send("Attempting Restart...")
             await bot.logout()
-            exit(Exitcodes.RESTART)
+            sys.exit(ExitCodes.RESTART)
 
       @commands.command(name="reload", aliases=["rl"])
       @commands.is_owner()
