@@ -97,7 +97,9 @@ class Core(commands.Cog):
             else:
                   link = userav.avatar_url_as(format='png', size=1024)
 
-            e = discord.Embed(color=ctx.guild.get_member(userav.id).top_role.color)
+            user_member_color = ctx.guild.get_member(userav.id).top_role.color
+            # e = discord.Embed(color=user_member_color if user_member_color != int('#000000') else discord.Colour.random())
+            e = discord.Embed(color=user_member_color)
             e.set_image(url=link)
             e.set_author(name=f"{userav.name}'s avatar", icon_url=link, url=link)
             footer = f"{ctx.author.name} wanted to see." if userav != ctx.author else "So you wanted to see yourself, eh?"
@@ -628,7 +630,7 @@ class Core(commands.Cog):
                   (r"N([aeiou])", r"Ny\1"),
                   (r"N([AEIOU])", r"NY\1"),
                   (r"ove", "uv"),
-                  (r"!+", face),
+                  (r"!+", face)
             ]
 
             for pattern, replacement in patterns:

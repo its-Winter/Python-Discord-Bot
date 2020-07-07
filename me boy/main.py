@@ -1,5 +1,4 @@
 import discord
-from discord import message
 from discord.ext import commands
 from discord.ext.commands import context, errors
 from discord.ext.commands import core
@@ -10,6 +9,7 @@ import platform
 import asyncio
 import arrow
 import logging
+import sqlite3
 from enum import IntEnum
 
 from cogs.utils import (
@@ -53,8 +53,41 @@ if settings["token"] is None:
       with open('settings.json', 'w') as j:
             json.dump(settings, j, indent=6)
 
+# async with sqlite3.connect('main.db') as db:
+#       with db.cursor() as cursor:
+#             cursor.execute("SELECT 'token' FROM 'bot config'")
+
 desc = "I'm {bot name here}! Originally a project to learn python from scratch, and soon to be fully public!"
-bot = commands.AutoShardedBot(command_prefix=settings["prefix"], description=desc, case_insensitive=True, owner_id=settings["ownerid"])
+
+class Bot(commands.bot.AutoShardedBot):
+
+      def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.owner = super().get_user(261401343208456192)
+
+      def loadallcogs(self):
+            """loads cogs"""
+            loaded = []
+            errors = []
+            ignore = ["Utils", "Auditlogs"]
+            for cog in os.listdir("cogs"):
+                  if cog.endswith("py"):
+                        filename = cog[:-3]
+                        cog = filename.capitalize()
+                        if cog is None or cog in ignore:
+                              continue
+                        try:
+                              bot.load_extension(f"cogs.{filename}")
+                              loaded.append(cog)
+                        except Exception as e:
+                              errors.append(e)
+
+            loaded = humanize_list(loaded)
+            print(f"Loaded: {loaded}")
+            if len(errors) > 0:
+                  print(f"Errors: {errors}")
+
+bot = Bot(command_prefix=settings["prefix"], description=desc, case_insensitive=True, owner_id=settings["ownerid"])
 
 @bot.event
 async def on_ready():
@@ -94,28 +127,6 @@ async def on_command(ctx):
             msg += f" in {ctx.guild.name}"
       print(msg)
 
-def loadallcogs():
-      # loads cogs
-      loaded = []
-      errors = []
-      ignore = ["Utils", "Auditlogs"]
-      for cog in os.listdir("cogs"):
-            if cog.endswith("py"):
-                  filename = cog[:-3]
-                  cog = filename.capitalize()
-                  if cog is None or cog in ignore:
-                        continue
-                  try:
-                        bot.load_extension(f"cogs.{filename}")
-                        loaded.append(cog)
-                  except Exception as e:
-                        errors.append(e)
-      
-      loaded = humanize_list(loaded)
-      print(f"Loaded: {loaded}")
-      if len(errors) > 0:
-            print(f"Errors: {errors}")
-
 class ExitCodes(IntEnum):
     CRITICAL = 1
     SHUTDOWN = 0
@@ -132,7 +143,7 @@ class Owner(commands.Cog):
             with contextlib.suppress(discord.HTTPException):
                   if not silently:
                         await ctx.send("Shutting down...")
-            await ctx.bot.logout()
+            await self.bot.logout()
             sys.exit(ExitCodes.SHUTDOWN)
 
       @commands.command(name="restart", aliases=["rs"])
@@ -210,7 +221,9 @@ try:
       print("Loaded Owner commands.")
 except Exception as e:
       print(f"Could not load Owner commands.\nError: {e}")
-loadallcogs()
+
+bot.loadallcogs()
+
 try:
       bot.run(settings["token"])
 except KeyboardInterrupt:

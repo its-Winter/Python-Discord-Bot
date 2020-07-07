@@ -21,6 +21,7 @@ START_CODE_BLOCK_RE = re.compile(r"^((```py)(?=\s)|(```))")
 
 class Dev(commands.Cog):
       def __init__(self, bot):
+            super().__init__()
             self.bot = bot
             self._last_result = None
 

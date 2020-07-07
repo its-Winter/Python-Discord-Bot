@@ -11,19 +11,17 @@ class Osu(commands.Cog):
             self.bot = bot
 
       @commands.command(name="osu")
-      async def _osu(self, ctx, username = None):
+      async def _osu(self, ctx, username: str = None):
             """Shows a osu user!"""
             if username is None or len(username) <= 0:
-                  await ctx.send("Please give an osu name to look up.")
-                  return
-
+                  return await ctx.send("Please give an osu name to look up.")
+                 
             with open('settings.json', 'r') as data:
                   apikey = json.load(data)["apis"]["osu"]
 
             if apikey is None or apikey == "":
-                  await ctx.send("Failed to find apikey.")
-                  return
-
+                  return await ctx.send("Failed to find apikey.")
+                  
             # Queries api to get osu profile
             headers = {"content-type": "application/json", "user-key": apikey}
 
