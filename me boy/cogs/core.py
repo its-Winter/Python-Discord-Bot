@@ -187,18 +187,21 @@ class Core(commands.Cog):
 
       @commands.command(name="dm")
       @commands.guild_only()
-      async def _dm(self, ctx, user: str, *, message: str = None):
+      async def _dm(self, ctx, user: Union[discord.User, str], *, message: Optional[str] = None):
             """Direct message a user from the bot."""
             if user is None:
                   await ctx.send("Provided no user to search for.")
                   return
             else:
-                  try:
-                        user = ctx.guild.get_member_named(user)
-                        if user is None:
-                              user = ctx.guild.get_member(int(user))
-                  except Exception as e:
-                        await ctx.send(f"Failed to fetch user: {e}")
+                  while user is None:
+                        if isinstance(user, discord.User):
+                              user = user
+                        try:
+                              user = ctx.guild.get_member_named(user)
+                              if user is None:
+                                    user = ctx.guild.get_member(int(user))
+                        except Exception as e:
+                              await ctx.send(f"Failed to fetch user: {e}")
             
             if user is None:
                   await ctx.send(f"Failed to find that user: {user}")
@@ -235,7 +238,7 @@ class Core(commands.Cog):
                   await ctx.send(msg)
 
             def pred(m):
-                  return True if m.author.id == ctx.message.author.id and m.content in responses else False
+                  return m.author.id == ctx.message.author.id and m.content in responses
 
             try:
                   msg = await ctx.bot.wait_for("message", check=pred, timeout=15)

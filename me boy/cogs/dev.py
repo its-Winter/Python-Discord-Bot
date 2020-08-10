@@ -9,6 +9,7 @@ import inspect
 import subprocess, threading
 import re, ast
 import io
+import traceback
 from discord.ext import commands
 from discord.ext.commands import core
 from cogs.utils import bordered, box, is_allowed, hastepaste, pagify

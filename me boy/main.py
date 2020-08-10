@@ -11,7 +11,7 @@ import arrow
 import logging
 import sqlite3
 from enum import IntEnum
-
+from typing import Optional
 from cogs.utils import (
       humanize_list,
       bold
@@ -64,23 +64,28 @@ class Bot(commands.bot.AutoShardedBot):
       def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.owner = super().get_user(261401343208456192)
+            self.load_after_ready = ["Audio", "Wolfpack"]
 
-      def loadallcogs(self):
+      def load_cogs(self, cogs: Optional[list] = None):
             """loads cogs"""
+            if not cogs:
+                  cogs = [cog[:-3] for cog in os.listdir("cogs") if cog.endswith("py")]
             loaded = []
             errors = []
             ignore = ["Utils", "Auditlogs"]
-            for cog in os.listdir("cogs"):
+            for cog in cogs:
                   if cog.endswith("py"):
                         filename = cog[:-3]
-                        cog = filename.capitalize()
-                        if cog is None or cog in ignore:
-                              continue
-                        try:
-                              bot.load_extension(f"cogs.{filename}")
-                              loaded.append(cog)
-                        except Exception as e:
-                              errors.append(e)
+                  else:
+                        filename = cog
+                  cog = filename.capitalize()
+                  if cog is None or cog in ignore:
+                        continue
+                  try:
+                        bot.load_extension(f"cogs.{filename}")
+                        loaded.append(cog)
+                  except Exception as e:
+                        errors.append(f"{type(e).__name__}: {e}")
 
             loaded = humanize_list(loaded)
             print(f"Loaded: {loaded}")
@@ -96,6 +101,8 @@ async def on_ready():
       bot_appinfo = await bot.application_info()
       bot.invite_url = discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(permissions=8))
       bot._last_exception = None
+      print("Loading cogs that need to be loaded after ready...")
+      bot.load_cogs(bot.load_after_ready)
       print(
             f"""\n
 Discord.py:       {discord.__version__}
@@ -120,8 +127,8 @@ async def on_message(message):
 
 @bot.event
 async def on_command(ctx):
-      msg = f"[{arrow.now('US/Eastern').strftime('%x %X')}] {ctx.message.author} called {ctx.message.content}"
-      if ctx.message.guild is None:
+      msg = f"[{arrow.now('US/Eastern').strftime('%x %X')}] {ctx.author} called {ctx.message.content}"
+      if ctx.guild is None:
             msg += " in DMs"
       else:
             msg += f" in {ctx.guild.name}"
@@ -222,7 +229,7 @@ try:
 except Exception as e:
       print(f"Could not load Owner commands.\nError: {e}")
 
-bot.loadallcogs()
+bot.load_cogs()
 
 try:
       bot.run(settings["token"])

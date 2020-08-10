@@ -19,14 +19,15 @@ def randomize_colour(embed: discord.Embed) -> discord.Embed:
       embed.colour = discord.Color(value=randint(0x000000, 0xFFFFFF))
       return embed
 
+def guilds_allowed(*ids: int):
+      def predicate(ctx):
+            return ctx.guild.id in ids
+      return commands.check(predicate)
+
 def is_allowed(*ids: int):
       def predicate(ctx):
             return ctx.author.id in ids
       return commands.check(predicate)
-
-async def get_owner(bot) -> str:
-      application_info = await bot.application_info()
-      return application_info.owner
 
 def botuptime(bot) -> str:
       uptime = arrow.utcnow() - bot.start_time
@@ -120,7 +121,7 @@ def bordered(*columns, ascii_border: bool = False) -> str:
 
 def humanize_list(items: Sequence[str]) -> str:
       if len(items) == 1:
-            return items[0]
+            return str(items[0])
       try:
             return ", ".join(items[:-1]) + ", and " + items[-1]
       except IndexError:
