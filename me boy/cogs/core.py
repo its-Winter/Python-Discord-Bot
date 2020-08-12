@@ -14,18 +14,12 @@ from datetime import datetime
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from cogs.utils import (
-      botuptime,
-      bold,
-      box,
-      bordered,
-      inline,
-      humanize_list,
-      pagify
-)
+from cogs.utils import Utils
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
+
+urlreg = re.compile(r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+")
 
 class Core(commands.Cog):
       def __init__(self, bot):
@@ -49,7 +43,7 @@ class Core(commands.Cog):
                   return await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
                   if len(users) > 1:
-                        users = humanize_list(users)
+                        users = Utils.humanize_list(users)
                   else:
                         users = users[0].mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
@@ -65,8 +59,8 @@ class Core(commands.Cog):
                   destination = ctx.channel
 
             if self.bot._last_exception:
-                  for page in pagify(self.bot._last_exception):
-                        await destination.send(box(page, lang="py"))
+                  for page in Utils.pagify(self.bot._last_exception):
+                        await destination.send(Utils.box(page, lang="py"))
             else:
                   await ctx.send("No exception has occurred yet")
 
@@ -76,21 +70,8 @@ class Core(commands.Cog):
             """Show any user's avatar."""
             if not user:
                   userav = ctx.author
-            elif isinstance(user, discord.User):
-                  userav = user
-            elif not isinstance(user, int):
-                  userav = ctx.guild.get_member_named(user)
             else:
-                  userav = ctx.guild.get_member(user) 
-                  if userav is None:
-                        userav = await ctx.bot.fetch_user(user)
-
-            if userav:
-                  if userav not in ctx.guild.members:
-                        return await ctx.send(f"Sorry, {userav.name} is not apart of this guild.")
-            else:
-                  await ctx.send(userav)
-                  return await ctx.send(f"Could not find: {inline(str(user))}")
+                  userav = await Utils.get_user(ctx, user)
             
             if userav.is_avatar_animated():
                   link = userav.avatar_url_as(format='gif', size=1024)
@@ -121,7 +102,7 @@ class Core(commands.Cog):
       async def _uptime(self, ctx):
             """Shows bot's uptime since last startup."""
             async with ctx.typing():
-                  uptimestr = botuptime(ctx.bot)
+                  uptimestr = Utils.botuptime(ctx.bot)
                   e = discord.Embed(description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green())
                   e.set_author(name="Uptime", icon_url=ctx.bot.user.avatar_url)
                   e.set_footer(text=f"summoned by {ctx.author}", icon_url=ctx.author.avatar_url)
@@ -193,32 +174,66 @@ class Core(commands.Cog):
                   await ctx.send("Provided no user to search for.")
                   return
             else:
-                  while user is None:
-                        if isinstance(user, discord.User):
-                              user = user
-                        try:
-                              user = ctx.guild.get_member_named(user)
-                              if user is None:
-                                    user = ctx.guild.get_member(int(user))
-                        except Exception as e:
-                              await ctx.send(f"Failed to fetch user: {e}")
-            
-            if user is None:
-                  await ctx.send(f"Failed to find that user: {user}")
-                  return
+                  user = await Utils.get_user(ctx, user)
 
             if user.bot is True:
                   await ctx.send("I cannot send messages to other bots pandejo.")
                   return
 
-            if not user.dm_channel:
-                  await user.create_dm()
+            if ctx.channel.permissions_for(user).read_messages:
+                  # await ctx.message.delete()
+                  delete = True
+
+            e = discord.Embed(description=message, color=discord.Colour.blurple())
+
+            urls = re.findall(urlreg, message)
+            if urls:
+                  if len(ctx.message.attachments) > 0:
+                        e.set_image(url=ctx.message.attachments[0].url)
+                        e.set_thumbnail(url=urls[0])
+                  else:
+                        e.set_image(url=urls[0])
+
             try:
-                  e = discord.Embed(description=message, color=discord.Colour.blurple())
                   e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
                   e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
                   await user.send(embed=e)
-                  await ctx.send(f"Sent your message to {user}.")
+                  await ctx.send(f"Sent your message to {user}.", delete_after=5 if delete else None)
+            except Exception as e:
+                  await ctx.send(f"Failed to send message to {user}. {e}")
+
+      @commands.command(name="anondm")
+      @commands.guild_only()
+      async def _anon_dm(self, ctx, user: Union[discord.User, str], *, message: Optional[str] = None):
+            """Direct message a user from the bot."""
+            if user is None:
+                  await ctx.send("Provided no user to search for.")
+                  return
+            else:
+                  user = await Utils.get_user(ctx, user)
+
+            if user.bot is True:
+                  await ctx.send("I cannot send messages to other bots.")
+                  return
+
+            if ctx.channel.permissions_for(user).read_messages:
+                  await ctx.message.delete()
+                  delete = True
+
+            urls = re.findall(urlreg, message)
+            if urls:
+                  if len(ctx.message.attachments) > 0:
+                        e.set_image(url=ctx.message.attachments[0].url)
+                        e.set_thumbnail(url=urls[0])
+                  else:
+                        e.set_image(url=urls[0])
+
+            try:
+                  e = discord.Embed(description=message, color=discord.Colour.blurple())
+                  e.set_author(name=f"Message from {ctx.guild}...", icon_url=ctx.guild.icon_url)
+                  e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+                  await user.send(embed=e)
+                  await ctx.send(f"Sent your message to {user}.", delete_after=5 if delete else None)
             except Exception as e:
                   await ctx.send(f"Failed to send message to {user}. {e}")
 
@@ -233,7 +248,7 @@ class Core(commands.Cog):
             async with ctx.typing():
                   for i, guild in enumerate(all_guilds, 1):
                         msg += f"{i}: ``{guild.name}`` ({guild.id})\n"
-                        responses.append(str(i))
+                        responses.append(i)
                   query = await ctx.send("To leave a server, just type its number.")
                   await ctx.send(msg)
 
@@ -241,7 +256,7 @@ class Core(commands.Cog):
                   return m.author.id == ctx.message.author.id and m.content in responses
 
             try:
-                  msg = await ctx.bot.wait_for("message", check=pred, timeout=15)
+                  guild = await ctx.bot.wait_for("message", check=pred, timeout=15)
                   if guild.owner.id == ctx.bot.user.id:
                         return await ctx.send("I cannot leave a guild I am the owner of.")
             except asyncio.TimeoutError:
@@ -264,41 +279,6 @@ class Core(commands.Cog):
                   await query.delete()
                   await ctx.send("Response timed out.")
 
-      @commands.command(name="dmid")
-      @commands.is_owner()
-      async def _dmid(self, ctx, id: int, *, message: str = None):
-            """Direct message any user id with a message."""
-            if not isinstance(id, int):
-                  return await ctx.send("You have not entered a valid ID")
-
-            if not message:
-                  return await ctx.send("You must give a message to send.")
-
-            try:
-                  user = await ctx.bot.fetch_user(int(id))
-            except Exception as e:
-                  return await ctx.send(f"Error happened while trying to fetch user.\n{e}")
-
-            if user.bot is True:
-                  return await ctx.send("I cannot send messages to bots")
-
-            if not user.dm_channel:
-                  await user.create_dm()
-
-            message = " ".join(message)
-            e = discord.Embed(description=message, color=discord.Color.blurple())
-            e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
-            e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
-            try:
-                  await user.send(embed=e)
-                  return await ctx.send(f"Message has been sent to `{user}`!")
-            except discord.Forbidden:
-                  return await ctx.send(f"Cannot send messages to {user.name}")
-            except discord.HTTPException:
-                  return await ctx.send("Message failed.")
-            except Exception as e:
-                  await ctx.send(f"Error while sending embed. {e}")
-
       @commands.command(name="serverinfo", aliases=["guildinfo", "sinfo", "ginfo"])
       @commands.guild_only()
       async def _serverinfo(self, ctx, details: bool = True):
@@ -320,10 +300,10 @@ class Core(commands.Cog):
                   data = discord.Embed(color=ctx.guild.me.top_role.color, description=desc)
                   data.set_author(name=guild.name)
                   data.set_thumbnail(url=guild.icon_url)
-                  data.add_field(name="Region", value=bold(guild.region))
-                  data.add_field(name="Users Online", value=bold(f"{online}/{guild.member_count}"))
-                  data.add_field(name="Roles", value=bold(len(guild.roles)))
-                  data.add_field(name="Owner", value=bold(str(guild.owner)))
+                  data.add_field(name="Region", value=Utils.bold(guild.region))
+                  data.add_field(name="Users Online", value=Utils.bold(f"{online}/{guild.member_count}"))
+                  data.add_field(name="Roles", value=Utils.bold(len(guild.roles)))
+                  data.add_field(name="Owner", value=Utils.bold(str(guild.owner)))
                   data.set_footer(text=f"ID: {guild.id}")
 
             else:
@@ -380,7 +360,7 @@ class Core(commands.Cog):
                               print(error)
                               continue
                         else:
-                              member_msg += f"{emoji} {bold(num)} " + (
+                              member_msg += f"{emoji} {Utils.bold(num)} " + (
                                     "\n" if count % 2 == 0 else ""
                               )
                         count += 1
@@ -464,17 +444,17 @@ class Core(commands.Cog):
                         value= (
                               "\N{SPEECH BALLOON} Text: {text}\n"
                               "\N{SPEAKER WITH THREE SOUND WAVES} Voice: {voice}"
-                        ).format(text=bold(text_channels), voice=bold(voice_channels)),
+                        ).format(text=Utils.bold(text_channels), voice=Utils.bold(voice_channels)),
                   )
                   data.add_field(
                         name="Utility:",
                         value=(
                           "Owner: {owner}\nVoice region: {region}\nVerif. level: {verif}\nServer ID: {id}{shard_info}"
                         ).format(
-                              owner=bold(str(guild.owner)),
-                              region=bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
-                              verif=bold(verif[str(guild.verification_level)]),
-                              id=bold(str(guild.id)),
+                              owner=Utils.bold(str(guild.owner)),
+                              region=Utils.bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
+                              verif=Utils.bold(verif[str(guild.verification_level)]),
+                              id=Utils.bold(str(guild.id)),
                               shard_info=shard_info,
                         ),
                         inline=False,
@@ -484,12 +464,12 @@ class Core(commands.Cog):
                         value=(
                               "AFK channel: {afk_chan}\nAFK timeout: {afk_timeout}\nCustom emojis: {emoji_count}\nRoles: {role_count}"
                         ).format(
-                              afk_chan=bold(str(guild.afk_channel))
+                              afk_chan=Utils.bold(str(guild.afk_channel))
                               if guild.afk_channel
-                              else bold("Not Set"),
-                              afk_timeout=bold(guild.afk_timeout),
-                              emoji_count=bold(len(guild.emojis)),
-                              role_count=bold(len(guild.roles)),
+                              else Utils.bold("Not Set"),
+                              afk_timeout=Utils.bold(guild.afk_timeout),
+                              emoji_count=Utils.bold(len(guild.emojis)),
+                              role_count=Utils.bold(len(guild.roles)),
                         ),
                         inline=False,
                   )
@@ -502,11 +482,11 @@ class Core(commands.Cog):
                               "Emoji limit: {emojis_limit}\n"
                               "VCs max bitrate: {bitrate}"
                         ).format(
-                              boostlevel=bold(str(guild.premium_tier)),
-                              nitroboosters=bold(guild.premium_subscription_count),
-                              filelimit=bold(_size(guild.filesize_limit)),
-                              emojis_limit=bold(str(guild.emoji_limit)),
-                              bitrate=bold(_bitsize(guild.bitrate_limit)),
+                              boostlevel=Utils.bold(str(guild.premium_tier)),
+                              nitroboosters=Utils.bold(guild.premium_subscription_count),
+                              filelimit=Utils.bold(_size(guild.filesize_limit)),
+                              emojis_limit=Utils.bold(str(guild.emoji_limit)),
+                              bitrate=Utils.bold(_bitsize(guild.bitrate_limit)),
                         )
                         data.add_field(name="Nitro Boost:", value=nitro_boost)
                   if guild.splash:
@@ -530,7 +510,9 @@ class Core(commands.Cog):
             guild = ctx.guild
 
             if not user:
-                user = author
+                  user = author
+            else:
+                  user = await Utils.get_user(ctx, user)
 
             #  A special case for a special someone :^)
             special_date = datetime(2016, 1, 10, 6, 8, 4, 443000)
@@ -614,7 +596,7 @@ class Core(commands.Cog):
 
             name = str(user)
             name = " ~ ".join((name, user.nick)) if user.nick else name
-            name = filter_invites(name)
+            name = Utils.filter_invites(name)
 
             avatar = user.avatar_url_as(static_format="png")
             data.set_author(name=f"{statusemoji} {name}", url=avatar)
@@ -623,7 +605,7 @@ class Core(commands.Cog):
             await ctx.send(embed=data)
 
       @commands.command(name="uwu", aliases=["owo"])
-      async def _owoify(self, ctx, *, s: str):
+      async def _owoify(self, ctx, *, s: str = None):
             faces = ["(・`ω´・)", "OwO", "owo", "oωo", "òωó", "°ω°", "UwU", ">w<", "^w^"]
             face = choice(faces)
             patterns = [
@@ -635,6 +617,11 @@ class Core(commands.Cog):
                   (r"ove", "uv"),
                   (r"!+", face)
             ]
+
+            if not s:
+                  s = await ctx.channel.history(limit=1, before=ctx.message.created_at, oldest_first=False).flatten()
+                  s = s[0].content
+                        
 
             for pattern, replacement in patterns:
                   s = re.sub(pattern, replacement, s)

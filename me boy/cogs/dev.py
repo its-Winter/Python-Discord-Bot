@@ -12,7 +12,7 @@ import io
 import traceback
 from discord.ext import commands
 from discord.ext.commands import core
-from cogs.utils import bordered, box, is_allowed, hastepaste, pagify
+from cogs.utils import Utils
 from contextlib import redirect_stdout
 from asyncio.subprocess import PIPE, STDOUT
 from subprocess import Popen
@@ -56,19 +56,19 @@ class Dev(commands.Cog):
             Returns a string representation of the error formatted as a codeblock.
             """
             if e.text is None:
-                  return box("{0.__class__.__name__}: {0}".format(e), lang="py")
-            return box(
+                  return Utils.box("{0.__class__.__name__}: {0}".format(e), lang="py")
+            return Utils.box(
                   "{0.text}\n{1:>{0.offset}}\n{2}: {0}".format(e, "^", type(e).__name__), lang="py"
             )
 
       @commands.command(name="border")
       @commands.guild_only()
       async def _border_ig(self, ctx, *columns, ascii_border: bool = True):
-            result = bordered(*columns, ascii_border=ascii_border)
-            await ctx.send(box(result))
+            result = Utils.bordered(*columns, ascii_border=ascii_border)
+            await ctx.send(Utils.box(result))
 
       @commands.command(name="test")
-      @is_allowed(261401343208456192)
+      @Utils.is_allowed(261401343208456192)
       async def only_germ(self, ctx):
             await ctx.send(f"fuck you too {ctx.author.mention}")
 
@@ -84,10 +84,10 @@ class Dev(commands.Cog):
             source = inspect.getsource(cmd.callback)
 
             if len(source) > 1990:
-                  paste = await hastepaste(source)
+                  paste = await Utils.hastepaste(source)
                   await ctx.send(f'Source too big, uploaded to HastePaste: <{paste}>')
             else:
-                  await ctx.send(box(source, lang="py"))
+                  await ctx.send(Utils.box(source, lang="py"))
 
       @commands.command(name="eval")
       @commands.is_owner()
@@ -152,8 +152,8 @@ class Dev(commands.Cog):
                   msg = printed
             msg = self.sanitize_output(ctx, msg)
 
-            for page in pagify(msg):    
-                  await ctx.send(box(page, lang="py"))
+            for page in Utils.pagify(msg):    
+                  await ctx.send(Utils.box(page, lang="py"))
 
       @commands.command(aliases=["shell"])
       @commands.is_owner()
@@ -163,7 +163,7 @@ class Dev(commands.Cog):
             out = await proc.stdout.read()
             msg = out.decode('utf-8')
             await ctx.send(f"```ini\n\n[Command Prompt Input]: {arg}\n```")
-            await ctx.send(box(msg, lang="cmd"))
+            await ctx.send(Utils.box(msg, lang="cmd"))
 
 def setup(bot):
       bot.add_cog(Dev(bot))

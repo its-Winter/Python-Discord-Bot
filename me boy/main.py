@@ -12,10 +12,7 @@ import logging
 import sqlite3
 from enum import IntEnum
 from typing import Optional
-from cogs.utils import (
-      humanize_list,
-      bold
-)
+from cogs.utils import Utils
 
 # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 # filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
@@ -63,31 +60,37 @@ class Bot(commands.bot.AutoShardedBot):
 
       def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.owner = super().get_user(261401343208456192)
-            self.load_after_ready = ["Audio", "Wolfpack"]
+            self.load_after_ready = ["audio", "wolfpack"]
 
       def load_cogs(self, cogs: Optional[list] = None):
             """loads cogs"""
-            if not cogs:
-                  cogs = [cog[:-3] for cog in os.listdir("cogs") if cog.endswith("py")]
             loaded = []
             errors = []
-            ignore = ["Utils", "Auditlogs"]
-            for cog in cogs:
-                  if cog.endswith("py"):
-                        filename = cog[:-3]
-                  else:
-                        filename = cog
-                  cog = filename.capitalize()
-                  if cog is None or cog in ignore:
-                        continue
-                  try:
-                        bot.load_extension(f"cogs.{filename}")
-                        loaded.append(cog)
-                  except Exception as e:
-                        errors.append(f"{type(e).__name__}: {e}")
+            ignore = ["utils", "auditlogs"]
+            if not cogs:
+                  cogs = [cog[:-3] for cog in os.listdir("cogs") if cog.endswith("py")]
+                  for filename in cogs:
+                        if filename is None or filename in ignore or filename in self.load_after_ready:
+                              continue
+                        cog = filename.capitalize()
+                        try:
+                              bot.load_extension(f"cogs.{filename}")
+                              loaded.append(cog)
+                        except Exception as e:
+                              errors.append(f"{type(e).__name__}: {e}")
+            else:
+                  for filename in cogs:
+                        if filename in ignore:
+                              continue
+                        cog = filename.capitalize()
+                        try:
+                              bot.load_extension(f"cogs.{filename}")
+                              loaded.append(cog)
+                        except Exception as e:
+                              errors.append(f"{type(e).__name__}: {e}")
+            
 
-            loaded = humanize_list(loaded)
+            loaded = Utils.humanize_list(loaded)
             print(f"Loaded: {loaded}")
             if len(errors) > 0:
                   print(f"Errors: {errors}")
@@ -96,8 +99,8 @@ bot = Bot(command_prefix=settings["prefix"], description=desc, case_insensitive=
 
 @bot.event
 async def on_ready():
-      bot.start_time = arrow.utcnow()
-      # await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Winter develop me."))
+      if not hasattr(bot, "start_time"):
+            bot.start_time = arrow.utcnow()
       bot_appinfo = await bot.application_info()
       bot.invite_url = discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(permissions=8))
       bot._last_exception = None
@@ -143,6 +146,11 @@ class Owner(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
+      @commands.command(name="cogs")
+      @commands.is_owner()
+      async def _cogs(self, ctx):
+            await ctx.send(Utils.humanize_list(sorted([extension[5:].capitalize() for extension in bot.extensions.keys()])))
+
       @commands.command(name="shutdown")
       @commands.is_owner()
       async def _shutdown(self, ctx, silently = False):
@@ -160,7 +168,7 @@ class Owner(commands.Cog):
             with contextlib.suppress(discord.HTTPException):
                   if not silently:
                         await ctx.send("Attempting Restart...")
-            await bot.logout()
+            await self.bot.logout()
             sys.exit(ExitCodes.RESTART)
 
       @commands.command(name="reload", aliases=["rl"])
@@ -173,12 +181,12 @@ class Owner(commands.Cog):
             errors = []
             for cog in cogs:
                   try:
-                        ctx.bot.reload_extension(f"cogs.{cog.lower()}")
+                        self.bot.reload_extension(f"cogs.{cog.lower()}")
                         reloaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
             if reloaded_cogs is not None and len(reloaded_cogs) > 0:
-                  reloaded_cogs = humanize_list(reloaded_cogs)
+                  reloaded_cogs = Utils.humanize_list(reloaded_cogs)
                   await ctx.send(f"Reloaded: {reloaded_cogs}")
             if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
@@ -193,11 +201,11 @@ class Owner(commands.Cog):
             errors = []
             for cog in cogs:
                   try:
-                        ctx.bot.load_extension(f"cogs.{cog.lower()}")
+                        self.bot.load_extension(f"cogs.{cog.lower()}")
                         loaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            loaded_cogs = humanize_list(loaded_cogs)
+            loaded_cogs = Utils.humanize_list(loaded_cogs)
             if loaded_cogs is not None and len(loaded_cogs) > 0:
                   await ctx.send(f"Loaded: {loaded_cogs}")
             if errors is not None and len(errors) > 0:
@@ -213,11 +221,11 @@ class Owner(commands.Cog):
             errors = []
             for cog in cogs:
                   try:
-                        ctx.bot.unload_extension(f"cogs.{cog.lower()}")
+                        self.bot.unload_extension(f"cogs.{cog.lower()}")
                         unloaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            unloaded_cogs = humanize_list(unloaded_cogs)
+            unloaded_cogs = Utils.humanize_list(unloaded_cogs)
             if unloaded_cogs is not None and len(unloaded_cogs) > 0:
                   await ctx.send(f"Unloaded: {unloaded_cogs}")
             if errors is not None and len(errors) > 0:

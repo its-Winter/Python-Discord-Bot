@@ -64,6 +64,18 @@ class Set(commands.Cog):
             except discord.Forbidden:
                   return await ctx.send("I lack the permission to change my nickname.")
 
+      @_set.command(name="name")
+      async def _name(self, ctx: commands.Context, name: str = None):
+            """Set bot user's name"""
+            if not name:
+                  await ctx.send("Nothing set.")
+                  return
+            try:
+                  pass
+            except:
+                  pass
+
+
       @_set.command(name="status")
       async def _status(self, ctx: commands.Context, status: str = None):
             """Set bot user's status."""
@@ -97,8 +109,8 @@ class Set(commands.Cog):
                   game = discord.Game(name=game)
             else:
                   game = None
-            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
-            await ctx.bot.change_presence(status=status, activity=game)
+            status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else discord.Status.online
+            await self.bot.change_presence(status=status, activity=game)
             if game:
                   return await ctx.send(f"Status set to `Playing {game.name}`")
             else:
@@ -107,12 +119,12 @@ class Set(commands.Cog):
       @_set.command(name="listening")
       async def _listening(self, ctx: commands.Context, *, listening: str = None):
             """set bot user's listening status."""
-            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+            status = self.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
             if listening:
                   activity = discord.Activity(name=listening, type=discord.ActivityType.listening)
             else:
                   activity = None
-            await ctx.bot.change_presence(status=status, activity=activity)
+            await self.bot.change_presence(status=status, activity=activity)
             if listening:
                   return await ctx.send(f"Status set to ``Listening to {listening}``")
             else:
@@ -121,17 +133,17 @@ class Set(commands.Cog):
       @_set.command(name="streaming", aliases=["stream"])
       async def _streaming(self, ctx: commands.Context, streamer: str = None, *, stream_title: str = None):
             """Set bot user's streaming status."""
-            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else None
+            status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else None
             if stream_title:
                   stream_title = stream_title.strip()
                   if "twitch.tv/" not in streamer:
                         streamer = "https://twitch.tv/" + streamer
                   activity = discord.Streaming(url=streamer, name=stream_title)
-                  await ctx.bot.change_presence(status=status, activity=activity)
+                  await self.bot.change_presence(status=status, activity=activity)
             elif streamer is not None:
                   return await ctx.send(f"Failed to provide a stream title.")
             else:
-                  await ctx.bot.change_presence(activity=None, status=status)
+                  await self.bot.change_presence(activity=None, status=status)
 
             if stream_title:
                   return await ctx.send(f"Status set to ``Streaming {stream_title}``")
@@ -141,12 +153,12 @@ class Set(commands.Cog):
       @_set.command(name="watching")
       async def _watching(self, ctx: commands.Context, *, watching: str = None):
             """Set bot user's watching status."""
-            status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+            status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else discord.Status.online
             if watching:
                   activity = discord.Activity(name=watching, type=discord.ActivityType.watching)
             else:
                   activity = None
-            await ctx.bot.change_presence(status=status, activity=activity)
+            await self.bot.change_presence(status=status, activity=activity)
             if watching:
                   return await ctx.send(f"Status set to ``Watching {watching}``")
             else:
@@ -157,7 +169,7 @@ class Set(commands.Cog):
             if text is None or text == "":
                   return await ctx.send("Nothing changed.")
             else:
-                  status = ctx.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
+                  status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else discord.Status.online
                   activity = discord.Activity(name=status, type=discord.ActivityType.custom)
             try:
                   await ctx.bot.change_presence(activity=activity)
@@ -188,8 +200,6 @@ class Set(commands.Cog):
                   return await ctx.send("Committed and closed connection successfully.")
             except Exception as e:
                   return await ctx.send(f"The following occurred: {e}")
-            
-
 
 def setup(bot):
       bot.add_cog(Set(bot))

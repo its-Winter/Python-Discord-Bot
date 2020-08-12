@@ -11,9 +11,8 @@ import math
 import discord
 import lavalink
 from discord.ext import commands
-from cogs.utils import randomize_colour
+from cogs.utils import Utils.
 from typing import Optional, Union
-from cogs.utils import inline, pagify
 
 time_rx = re.compile('[0-9]+')
 url_rx = re.compile(r'https?:\/\/(?:www\.)?.+')
