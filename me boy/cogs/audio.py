@@ -7,11 +7,11 @@ Compatibility with Python 3.5 should be possible if f-strings are removed.
 """
 import re
 import math
-
+import aiohttp
 import discord
 import lavalink
 from discord.ext import commands
-from cogs.utils import Utils.
+from cogs.utils import utils
 from typing import Optional, Union
 
 time_rx = re.compile('[0-9]+')
@@ -74,12 +74,20 @@ class Audio(commands.Cog):
             # The above looks dirty, we could alternatively use `bot.shards[shard_id].ws` but that assumes
             # the bot instance is an AutoShardedBot.
 
+      @commands.command(name="nodes")
+      @commands.is_owner()
+      async def _nodes(self, ctx):
+            if self.bot.lavalink.node_manager.nodes:
+                  await ctx.send(utils.box(self.bot.lavalink.node_manager.nodes, lang="py"))
+            else:
+                  await ctx.send("There are no nodes.")
+
       @commands.command(name="ensurenode")
       @commands.is_owner()
       async def _ensure_node(self, ctx):
             if not self.bot.lavalink.node_manager.nodes or self.bot.lavalink.node_manager.nodes[0].name != 'localhost':
                   self.bot.lavalink.add_node('127.0.0.1', 2333, 'youshallnotpass', 'na', 'localhost')  # Host, Port, Password, Region, Name
-                  await ctx.message.add_reaction("✅")
+                  await ctx.message.add_reaction("\N{WHITE HEAVY CHECK MARK}")
 
       @commands.command(name="lldc")
       @commands.is_owner()
@@ -291,7 +299,7 @@ class Audio(commands.Cog):
                   track_uri = track['info']['uri']
                   o += f'`{index}.` [{track_title}]({track_uri})\n'
 
-            embed = discord.Embed(color=discord.Color.blurple(), description=o)
+            embed = discord.Embed(color=discord.Color.blue(), description=o)
             await ctx.send(embed=embed)
 
       @commands.command(name="disconnect", aliases=['dc'])

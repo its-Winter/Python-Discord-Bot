@@ -1,5 +1,4 @@
 import sys
-import arrow
 import time
 import asyncio
 import aiohttp
@@ -14,7 +13,7 @@ from datetime import datetime
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from cogs.utils import Utils
+from cogs.utils import utils
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
@@ -25,14 +24,22 @@ class Core(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
+      @commands.command(name="say")
+      @commands.is_owner()
+      async def _say(self, ctx, *, say: str = None):
+            await ctx.message.delete()
+            if not say:
+                  return
+            await ctx.send(str(say))
+
       @commands.command(name="headpat", hidden=True)
       @commands.bot_has_guild_permissions(embed_links=True)
       async def _headpat(self, ctx: commands.Context):
             color = discord.Colour.from_rgb(254, 222, 214)
-            time = arrow.now(tz='US/Eastern')
+            time = datetime.now()
             e = discord.Embed(color=color, title=f"{ctx.author.name} headpat now!")
             e.set_image(url="https://cdn.discordapp.com/attachments/461381136661217283/711845948455780402/headpat_her.png")
-            e.set_footer(text=f"{time.strftime('%H:%M')} EST · {time.strftime('%I:%M')} EST")
+            e.set_footer(text=f"{time.strftime('%H:%M')} EST")
             await ctx.send(embed=e)
 
       @commands.command(name="welcome", hidden=True)
@@ -43,7 +50,7 @@ class Core(commands.Cog):
                   return await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
                   if len(users) > 1:
-                        users = Utils.humanize_list(users)
+                        users = utils.humanize_list(users)
                   else:
                         users = users[0].mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
@@ -59,8 +66,8 @@ class Core(commands.Cog):
                   destination = ctx.channel
 
             if self.bot._last_exception:
-                  for page in Utils.pagify(self.bot._last_exception):
-                        await destination.send(Utils.box(page, lang="py"))
+                  for page in utils.pagify(self.bot._last_exception):
+                        await destination.send(utils.box(page, lang="py"))
             else:
                   await ctx.send("No exception has occurred yet")
 
@@ -71,7 +78,7 @@ class Core(commands.Cog):
             if not user:
                   userav = ctx.author
             else:
-                  userav = await Utils.get_user(ctx, user)
+                  userav = utils.get_user(ctx.guild, user)
             
             if userav.is_avatar_animated():
                   link = userav.avatar_url_as(format='gif', size=1024)
@@ -92,7 +99,7 @@ class Core(commands.Cog):
       async def _germ(self, ctx):
             """it's a germ!"""
             germ = ctx.bot.get_user(216085324906889226)
-            germstime = arrow.now("US/Pacific").strftime("%X")
+            germstime = datetime.now().strftime("%X")
             e = discord.Embed(title=germ.name, description=f"this is germ: {germ.mention}", color=discord.Color.gold())
             e.set_author(name=germ.name, icon_url=germ.avatar_url)
             e.set_footer(text=f"{ctx.author.name} has asked about Germ at {germstime} PST", icon_url=ctx.author.avatar_url)
@@ -102,7 +109,7 @@ class Core(commands.Cog):
       async def _uptime(self, ctx):
             """Shows bot's uptime since last startup."""
             async with ctx.typing():
-                  uptimestr = Utils.botuptime(ctx.bot)
+                  uptimestr = utils.botuptime(ctx.bot)
                   e = discord.Embed(description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green())
                   e.set_author(name="Uptime", icon_url=ctx.bot.user.avatar_url)
                   e.set_footer(text=f"summoned by {ctx.author}", icon_url=ctx.author.avatar_url)
@@ -134,6 +141,14 @@ class Core(commands.Cog):
             e.add_field(name="Typing", value=f"```py\n{str(round(typlatency))} ms```")
 
             await message.edit(embed=e)
+
+      @commands.command(name="invite")
+      @commands.guild_only()
+      async def _invite(self, ctx):
+            try:
+                  await ctx.author.send(f"you can invite the bot from this link. {ctx.bot.invite_url}")
+            except:
+                  await ctx.send(f"you can invite the bot from this link. {ctx.bot.invite_url}")
 
       @commands.command(name="invites")
       @commands.guild_only()
@@ -174,33 +189,38 @@ class Core(commands.Cog):
                   await ctx.send("Provided no user to search for.")
                   return
             else:
-                  user = await Utils.get_user(ctx, user)
+                  user = utils.get_user(ctx.guild, user)
 
             if user.bot is True:
                   await ctx.send("I cannot send messages to other bots pandejo.")
                   return
 
-            if ctx.channel.permissions_for(user).read_messages:
-                  # await ctx.message.delete()
-                  delete = True
-
-            e = discord.Embed(description=message, color=discord.Colour.blurple())
-
-            urls = re.findall(urlreg, message)
-            if urls:
-                  if len(ctx.message.attachments) > 0:
-                        e.set_image(url=ctx.message.attachments[0].url)
-                        e.set_thumbnail(url=urls[0])
-                  else:
-                        e.set_image(url=urls[0])
-
             try:
-                  e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
-                  e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+                  urls = re.findall(urlreg, message)
+            except TypeError:
+                  urls = None
+            e = discord.Embed(description=message, color=discord.Colour.blurple())
+            attachment = ctx.message.attachments[0] if len(ctx.message.attachments) > 0 else None
+            if urls or attachment:
+                  e.set_image(url=attachment.url if attachment else urls[0])
+            
+            e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
+            e.set_footer(text=f"Sent at {datetime.now().strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+            
+            try:
                   await user.send(embed=e)
-                  await ctx.send(f"Sent your message to {user}.", delete_after=5 if delete else None)
+                  await ctx.send(f"Sent your message to {user.name}.")
             except Exception as e:
                   await ctx.send(f"Failed to send message to {user}. {e}")
+
+      @commands.command(name="dmid", hidden=True)
+      async def _dmid(self, ctx, user: int, message: str):
+            user = await utils.fetch_user(self.bot, user)
+            try:
+                  await user.send(message)
+                  await ctx.send(f"Sent message to {user.name}")
+            except discord.Forbidden:
+                  await ctx.send(f"Unable to send a message to {user.name}")
 
       @commands.command(name="anondm")
       @commands.guild_only()
@@ -210,32 +230,36 @@ class Core(commands.Cog):
                   await ctx.send("Provided no user to search for.")
                   return
             else:
-                  user = await Utils.get_user(ctx, user)
+                  user_found = utils.get_user(ctx.guild, user)
 
-            if user.bot is True:
+            if user_found is None:
+                  await ctx.send(f"No user found with `{user}`")
+
+            if user_found.bot is True:
                   await ctx.send("I cannot send messages to other bots.")
                   return
 
-            if ctx.channel.permissions_for(user).read_messages:
-                  await ctx.message.delete()
-                  delete = True
-
-            urls = re.findall(urlreg, message)
-            if urls:
-                  if len(ctx.message.attachments) > 0:
-                        e.set_image(url=ctx.message.attachments[0].url)
-                        e.set_thumbnail(url=urls[0])
-                  else:
-                        e.set_image(url=urls[0])
+            if ctx.channel.permissions_for(user_found).read_messages:
+                  delete = True # await ctx.message.delete()
 
             try:
-                  e = discord.Embed(description=message, color=discord.Colour.blurple())
+                  urls = re.findall(urlreg, message)
+            except TypeError:
+                  urls = None
+            e = discord.Embed(description=message, color=discord.Colour.blurple())
+            attachment = ctx.message.attachments[0] if len(ctx.message.attachments) > 0 else None
+            if urls or attachment:
+                  e.set_image(url=attachment.url if attachment else urls[0])
+
+            try:
                   e.set_author(name=f"Message from {ctx.guild}...", icon_url=ctx.guild.icon_url)
-                  e.set_footer(text=f"Sent at {arrow.now(tz='US/Eastern').strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
-                  await user.send(embed=e)
-                  await ctx.send(f"Sent your message to {user}.", delete_after=5 if delete else None)
+                  e.set_footer(text=f"Sent at {datetime.now().strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+                  await user_found.send(embed=e)
+                  await ctx.send(f"Sent your message to {user_found.display_name}.", delete_after=5 if delete else None)
+                  if delete:
+                        await ctx.message.delete()
             except Exception as e:
-                  await ctx.send(f"Failed to send message to {user}. {e}")
+                  await ctx.send(f"Failed to send message to {user_found}. {e}")
 
 
       @commands.command(name="guilds", aliases=["servers"])
@@ -300,10 +324,10 @@ class Core(commands.Cog):
                   data = discord.Embed(color=ctx.guild.me.top_role.color, description=desc)
                   data.set_author(name=guild.name)
                   data.set_thumbnail(url=guild.icon_url)
-                  data.add_field(name="Region", value=Utils.bold(guild.region))
-                  data.add_field(name="Users Online", value=Utils.bold(f"{online}/{guild.member_count}"))
-                  data.add_field(name="Roles", value=Utils.bold(len(guild.roles)))
-                  data.add_field(name="Owner", value=Utils.bold(str(guild.owner)))
+                  data.add_field(name="Region", value=utils.bold(guild.region))
+                  data.add_field(name="Users Online", value=utils.bold(f"{online}/{guild.member_count}"))
+                  data.add_field(name="Roles", value=utils.bold(len(guild.roles)))
+                  data.add_field(name="Owner", value=utils.bold(str(guild.owner)))
                   data.set_footer(text=f"ID: {guild.id}")
 
             else:
@@ -360,7 +384,7 @@ class Core(commands.Cog):
                               print(error)
                               continue
                         else:
-                              member_msg += f"{emoji} {Utils.bold(num)} " + (
+                              member_msg += f"{emoji} {utils.bold(num)} " + (
                                     "\n" if count % 2 == 0 else ""
                               )
                         count += 1
@@ -444,17 +468,17 @@ class Core(commands.Cog):
                         value= (
                               "\N{SPEECH BALLOON} Text: {text}\n"
                               "\N{SPEAKER WITH THREE SOUND WAVES} Voice: {voice}"
-                        ).format(text=Utils.bold(text_channels), voice=Utils.bold(voice_channels)),
+                        ).format(text=utils.bold(text_channels), voice=utils.bold(voice_channels)),
                   )
                   data.add_field(
                         name="Utility:",
                         value=(
                           "Owner: {owner}\nVoice region: {region}\nVerif. level: {verif}\nServer ID: {id}{shard_info}"
                         ).format(
-                              owner=Utils.bold(str(guild.owner)),
-                              region=Utils.bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
-                              verif=Utils.bold(verif[str(guild.verification_level)]),
-                              id=Utils.bold(str(guild.id)),
+                              owner=utils.bold(str(guild.owner)),
+                              region=utils.bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
+                              verif=utils.bold(verif[str(guild.verification_level)]),
+                              id=utils.bold(str(guild.id)),
                               shard_info=shard_info,
                         ),
                         inline=False,
@@ -464,12 +488,12 @@ class Core(commands.Cog):
                         value=(
                               "AFK channel: {afk_chan}\nAFK timeout: {afk_timeout}\nCustom emojis: {emoji_count}\nRoles: {role_count}"
                         ).format(
-                              afk_chan=Utils.bold(str(guild.afk_channel))
+                              afk_chan=utils.bold(str(guild.afk_channel))
                               if guild.afk_channel
-                              else Utils.bold("Not Set"),
-                              afk_timeout=Utils.bold(guild.afk_timeout),
-                              emoji_count=Utils.bold(len(guild.emojis)),
-                              role_count=Utils.bold(len(guild.roles)),
+                              else utils.bold("Not Set"),
+                              afk_timeout=utils.bold(guild.afk_timeout),
+                              emoji_count=utils.bold(len(guild.emojis)),
+                              role_count=utils.bold(len(guild.roles)),
                         ),
                         inline=False,
                   )
@@ -482,11 +506,11 @@ class Core(commands.Cog):
                               "Emoji limit: {emojis_limit}\n"
                               "VCs max bitrate: {bitrate}"
                         ).format(
-                              boostlevel=Utils.bold(str(guild.premium_tier)),
-                              nitroboosters=Utils.bold(guild.premium_subscription_count),
-                              filelimit=Utils.bold(_size(guild.filesize_limit)),
-                              emojis_limit=Utils.bold(str(guild.emoji_limit)),
-                              bitrate=Utils.bold(_bitsize(guild.bitrate_limit)),
+                              boostlevel=utils.bold(str(guild.premium_tier)),
+                              nitroboosters=utils.bold(guild.premium_subscription_count),
+                              filelimit=utils.bold(_size(guild.filesize_limit)),
+                              emojis_limit=utils.bold(str(guild.emoji_limit)),
+                              bitrate=utils.bold(_bitsize(guild.bitrate_limit)),
                         )
                         data.add_field(name="Nitro Boost:", value=nitro_boost)
                   if guild.splash:
@@ -512,7 +536,7 @@ class Core(commands.Cog):
             if not user:
                   user = author
             else:
-                  user = await Utils.get_user(ctx, user)
+                  user = await utils.get_user(ctx.guild, user)
 
             #  A special case for a special someone :^)
             special_date = datetime(2016, 1, 10, 6, 8, 4, 443000)
@@ -596,7 +620,7 @@ class Core(commands.Cog):
 
             name = str(user)
             name = " ~ ".join((name, user.nick)) if user.nick else name
-            name = Utils.filter_invites(name)
+            name = utils.filter_invites(name)
 
             avatar = user.avatar_url_as(static_format="png")
             data.set_author(name=f"{statusemoji} {name}", url=avatar)

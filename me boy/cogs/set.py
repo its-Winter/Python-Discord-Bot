@@ -55,7 +55,7 @@ class Set(commands.Cog):
             """Set bot user's nickname in current guild."""
             if not nick:
                   nick = None
-                  msg = f"Nickname Cleared."
+                  msg = "Nickname Cleared."
             else:
                   msg = f"Nickname set to `{nick}`."
             try:
@@ -84,7 +84,7 @@ class Set(commands.Cog):
                   "idle": [discord.Status.idle, "Idle"],
                   "dnd": [discord.Status.dnd, "Dnd"],
                   "invisible": [discord.Status.invisible, "Invisible"],
-                  "offline": [discord.Status.invisible, "Invisible"]
+                  "offline": [discord.Status.invisible, "Invisible"],
             }
             if status.lower() in statuses:
                   chosenstatus = statuses.get(status.lower())
@@ -105,30 +105,37 @@ class Set(commands.Cog):
             """Set bot user's playing status."""
             if game:
                   if len(game) > 128:
-                        return await ctx.send("Exceeded maximum length of 128 characters.")
+                        await ctx.send("Exceeded maximum length of 128 characters.")
+                        return
                   game = discord.Game(name=game)
             else:
                   game = None
             status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else discord.Status.online
             await self.bot.change_presence(status=status, activity=game)
             if game:
-                  return await ctx.send(f"Status set to `Playing {game.name}`")
+                  await ctx.send(f"Status set to `Playing {game.name}`")
+                  return
             else:
-                  return await ctx.send("Game cleared.")
+                  await ctx.send("Game cleared.")
+                  return
 
       @_set.command(name="listening")
       async def _listening(self, ctx: commands.Context, *, listening: str = None):
             """set bot user's listening status."""
             status = self.bot.guilds[0].me.status if len(ctx.bot.guilds) > 0 else discord.Status.online
             if listening:
+                  if listening.startswith("to "):
+                        listening = listening[3:]
                   activity = discord.Activity(name=listening, type=discord.ActivityType.listening)
             else:
                   activity = None
             await self.bot.change_presence(status=status, activity=activity)
             if listening:
-                  return await ctx.send(f"Status set to ``Listening to {listening}``")
+                  await ctx.send(f"Status set to ``Listening to {listening}``")
+                  return
             else:
-                  return await ctx.send("Listening cleared.")
+                  await ctx.send("Listening cleared.")
+                  return
 
       @_set.command(name="streaming", aliases=["stream"])
       async def _streaming(self, ctx: commands.Context, streamer: str = None, *, stream_title: str = None):
@@ -141,14 +148,17 @@ class Set(commands.Cog):
                   activity = discord.Streaming(url=streamer, name=stream_title)
                   await self.bot.change_presence(status=status, activity=activity)
             elif streamer is not None:
-                  return await ctx.send(f"Failed to provide a stream title.")
+                  await ctx.send(f"Failed to provide a stream title.")
+                  return
             else:
                   await self.bot.change_presence(activity=None, status=status)
 
             if stream_title:
-                  return await ctx.send(f"Status set to ``Streaming {stream_title}``")
+                  await ctx.send(f"Status set to ``Streaming {stream_title}``")
+                  return
             else:
-                  return await ctx.send("Status cleared.")
+                  await ctx.send("Status cleared.")
+                  return
 
       @_set.command(name="watching")
       async def _watching(self, ctx: commands.Context, *, watching: str = None):
@@ -160,14 +170,17 @@ class Set(commands.Cog):
                   activity = None
             await self.bot.change_presence(status=status, activity=activity)
             if watching:
-                  return await ctx.send(f"Status set to ``Watching {watching}``")
+                  await ctx.send(f"Status set to ``Watching {watching}``")
+                  return
             else:
-                  return await ctx.send("Watching cleared.")
+                  await ctx.send("Watching cleared.")
+                  return
 
       @_set.command(name="customstatus", hidden=True)
       async def _customstatus(self, ctx, *, text: str = None):
             if text is None or text == "":
-                  return await ctx.send("Nothing changed.")
+                  await ctx.send("Nothing changed.")
+                  return
             else:
                   status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else discord.Status.online
                   activity = discord.Activity(name=status, type=discord.ActivityType.custom)
@@ -180,7 +193,8 @@ class Set(commands.Cog):
       @commands.command(name="copystatus", aliases=["cpstatus"], hidden=True)
       async def _copy_status(self, ctx, person_to_copy: Optional[Union[discord.User, str]] = None):
             if not person_to_copy:
-                  return await ctx.send("Nobody to copy.")
+                  await ctx.send("Nobody to copy.")
+                  return
             if isinstance(person_to_copy, discord.User):
                   user = ctx.guild.get_member(user.id)
             pass
@@ -197,9 +211,11 @@ class Set(commands.Cog):
             try:
                   connection.commit()
                   connection.close()
-                  return await ctx.send("Committed and closed connection successfully.")
+                  await ctx.send("Committed and closed connection successfully.")
+                  return
             except Exception as e:
-                  return await ctx.send(f"The following occurred: {e}")
+                  await ctx.send(f"The following occurred: {e}")
+                  return
 
 def setup(bot):
       bot.add_cog(Set(bot))

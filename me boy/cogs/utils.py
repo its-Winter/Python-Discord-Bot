@@ -4,9 +4,8 @@ from typing import List, Sequence, Tuple, Optional, Union, SupportsInt
 from babel.numbers import format_decimal
 from random import randint
 from urllib.parse import quote
+from datetime import timezone, timedelta, datetime
 import discord
-import datetime
-import arrow
 import itertools
 import aiohttp
 
@@ -15,7 +14,7 @@ _headers = {
       'Content-Type': 'application/x-www-form-urlencoded'
 }
 
-class Utils:
+class utils:
 
       @staticmethod
       def randomize_colour(embed: discord.Embed) -> discord.Embed:
@@ -23,18 +22,19 @@ class Utils:
             return embed
 
       @staticmethod
-      async def get_user(ctx: commands.Context, user: Union[str, int, discord.Member, discord.User]):
+      def get_user(guild: discord.Guild, user: Union[str, int, discord.Member, discord.User]):
             if isinstance(user, discord.User):
-                  user = ctx.guild.get_member(user.id)
+                  user = guild.get_member(user.id)
             elif isinstance(user, int):
-                  user = ctx.guild.get_member(user)
+                  user = guild.get_member(user)
             elif isinstance(user, str):
-                  try:
-                        user = ctx.guild.get_member_named(user)
-                  except discord.NotFound:
-                        await ctx.send(f"User wasn't found: `{user}`")
-                        return
+                  user = guild.get_member_named(user)
+            
             return user
+
+      @staticmethod
+      def utc_to_local(utc_dt: datetime) -> datetime:
+            return utc_dt.replace(tzinfo=timezone.utc).astimezone(tz=None)
 
       @staticmethod
       def wolfpack():
@@ -54,8 +54,22 @@ class Utils:
                   return ctx.guild.id in ids
             return commands.check(predicate)
 
-      def botuptime(self, bot) -> str:
-            uptime = arrow.utcnow() - bot.start_time
+      @staticmethod
+      def nsfw_only():
+            async def predicate(ctx):
+                  if ctx.guild is None:
+                        await ctx.send("really? dms? nah bro.")
+                        return False
+                  if ctx.channel.is_nsfw():
+                        return True
+                  else:
+                        await ctx.send("This is not a nsfw channel.")
+                        return False
+            return commands.check(predicate)
+
+      @staticmethod
+      def botuptime(bot) -> str:
+            uptime = datetime.utcnow() - bot.start_time
             totalseconds = uptime.total_seconds()
             seconds = int(totalseconds)
             periods = [
@@ -74,7 +88,7 @@ class Utils:
                               continue
                         unit = plural_period_name if period_value > 1 else period_name
                         strings.append(f"{period_value} {unit}")
-            uptimestr = self.humanize_list(strings)
+            uptimestr = Utils.humanize_list(strings)
             return uptimestr
 
       @staticmethod
@@ -161,7 +175,7 @@ class Utils:
                   return None
 
       def humanize_timedelta(
-            self, *, timedelta: Optional[datetime.timedelta] = None, seconds: Optional[SupportsInt] = None
+            self, *, timedelta: Optional[datetime] = None, seconds: Optional[SupportsInt] = None
             ) -> str:
             try:
                   obj = seconds if seconds is not None else timedelta.total_seconds()
@@ -217,6 +231,59 @@ class Utils:
                   pages.append(chunk)
 
             return pages
+
+      @staticmethod
+      async def get_messages_for_deletion(
+            *,
+            channel: discord.TextChannel,
+            number = None,
+            check = lambda x: True,
+            limit = None,
+            before: Union[discord.Message, datetime] = None,
+            after: Union[discord.Message, datetime] = None,
+            delete_pinned: bool = False,
+      ) -> List[discord.Message]:
+            """
+            Gets a list of messages meeting the requirements to be deleted.
+            Generally, the requirements are:
+            - We don't have the number of messages to be deleted already
+            - The message passes a provided check (if no check is provided,
+              this is automatically true)
+            - The message is less than 14 days old
+            - The message is not pinned
+            Warning: Due to the way the API hands messages back in chunks,
+            passing after and a number together is not advisable.
+            If you need to accomplish this, you should filter messages on
+            the entire applicable range, rather than use this utility.
+            """
+
+            # This isn't actually two weeks ago to allow some wiggle room on API limits
+            two_weeks_ago = datetime.utcnow() - timedelta(days=14, minutes=-5)
+
+            def message_filter(message):
+                  return (
+                      check(message)
+                      and message.created_at > two_weeks_ago
+                      and (delete_pinned or not message.pinned)
+                  )
+
+            if after:
+                  if isinstance(after, discord.Message):
+                        after = after.created_at
+                  after = max(after, two_weeks_ago)
+
+            collected = []
+            async for message in channel.history(
+                  limit=limit, before=before, after=after, oldest_first=False
+            ):
+                  if message.created_at < two_weeks_ago:
+                        break
+                  if message_filter(message):
+                        collected.append(message)
+                  if number is not None and number <= len(collected):
+                        break
+
+            return collected
 
       @staticmethod
       async def hastepaste(content: str):

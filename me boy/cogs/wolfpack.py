@@ -1,9 +1,9 @@
 import asyncio
 import random
 import discord
-import arrow
+from datetime import datetime
 from discord.ext import commands
-from cogs.utils import Utils
+from cogs.utils import utils
 
 reactions = {
       "\N{WHITE HEAVY CHECK MARK}": 423840858777845761,
@@ -31,7 +31,7 @@ class WolfPack(commands.Cog):
                   "modlog": self.guild.get_channel(471873478337757194),
             }
 
-      @Utils.wolfpack()
+      @utils.guilds_only(336025135620423680)
       @commands.Cog.listener()
       async def on_raw_reaction_add(self, payload):
             if payload.channel_id == self.guild_stuff["rules"].id:
@@ -50,13 +50,13 @@ class WolfPack(commands.Cog):
                   elif payload.emoji.id == 580452557693124618:
                         await payload.member.add_roles(self.guild_stuff["dj"])
       
-      @Utils.wolfpack()
+      @utils.guilds_only(336025135620423680)
       @commands.Cog.listener()
       async def on_raw_reaction_remove(self, payload):
             if payload.channel_id == self.guild_stuff["free"].id:
                   pass
 
-      @Utils.wolfpack()
+      @utils.guilds_only(336025135620423680)
       @commands.Cog.listener()
       async def on_member_update(self, before, after):
             if len(before.roles) != len(after.roles):
@@ -79,14 +79,16 @@ class WolfPack(commands.Cog):
                                     if log.reason:
                                           reason = log.reason
                                     else:
-                                          reason = None
+                                          reason = discord.Embed.Empty
                                     break
+                              else:
+                                    perp = discord.Embed.Empty
                         if perp:
                               e.add_field(name="Updated by", value=perp.mention)
                         if reason:
                               e.add_field(name="Reason", value=reason)
                   
-                  e.set_footer(text=arrow.now().strftime("%H:%M:%S EST"), icon_url=perp.avatar_url or None)
+                  e.set_footer(text=datetime.now().strftime("%H:%M:%S EST"), icon_url=perp.avatar_url if perp else None)
                   await self.guild_stuff["modlog"].send(embed=e)
 
       def get_event_colour(self, event_type: str) -> discord.Colour:
