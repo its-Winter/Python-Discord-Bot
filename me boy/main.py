@@ -12,7 +12,7 @@ import logging
 import sqlite3
 from enum import IntEnum
 from typing import Optional
-from cogs.utils import Utils
+from cogs.utils import utils
 
 # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 # filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
@@ -60,7 +60,9 @@ class Bot(commands.bot.AutoShardedBot):
 
       def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.load_after_ready = ["audio", "wolfpack"]
+            self.load_after_ready = ["audio", "wolfpack", "specific"]
+            with open("prefixes.json", "r") as j:
+                  self.guild_prefixes = json.load(j)
 
       def load_cogs(self, cogs: Optional[list] = None):
             """loads cogs"""
@@ -90,12 +92,24 @@ class Bot(commands.bot.AutoShardedBot):
                               errors.append(f"{type(e).__name__}: {e}")
             
 
-            loaded = Utils.humanize_list(loaded)
+            loaded = utils.humanize_list(loaded)
             print(f"Loaded: {loaded}")
             if len(errors) > 0:
                   print(f"Errors: {errors}")
 
-bot = Bot(command_prefix=settings["prefix"], description=desc, case_insensitive=True, owner_id=settings["ownerid"])
+
+async def get_prefix(bot, message):
+      if not message.guild:
+            return "."
+      guild_id = str(message.guild.id)
+      prefixes = bot.guild_prefixes.get(guild_id, None)
+      if prefixes is None:
+            return "."
+      elif "." not in prefixes:
+            prefixes.append(".")
+      return prefixes
+
+bot = Bot(command_prefix=get_prefix, description=desc, case_insensitive=True, owner_id=settings["ownerid"])
 
 @bot.event
 async def on_ready():
@@ -107,11 +121,11 @@ async def on_ready():
       print("Loading cogs that need to be loaded after ready...")
       bot.load_cogs(bot.load_after_ready)
       print(
-            f"""\n
+            f"""
 Discord.py:       {discord.__version__}
 Python:           {platform.python_version()}
 Connected as:     {bot.user}
-Prefix:           {bot.command_prefix}
+Default Prefix:   .
 Owner:            {bot_appinfo.owner}
       """
       )
@@ -122,11 +136,13 @@ async def on_connect():
 
 @bot.event
 async def on_disconnect():
+      with open("prefixes.json", "w") as j:
+            json.dump(bot.guild_prefixes, j, indent=6)
       print(f"{bot.user} has been disconnected from Discord.")
 
 @bot.event
-async def on_message(message):
-      await bot.process_commands(message)
+async def on_resumed():
+      print(f"{bot.user} has been reconnected to Discord.")
 
 @bot.event
 async def on_command(ctx):
@@ -136,6 +152,10 @@ async def on_command(ctx):
       else:
             msg += f" in {ctx.guild.name}"
       print(msg)
+
+@bot.event
+async def on_error(error, *args, **kwargs):
+      bot._last_exception = error
 
 class ExitCodes(IntEnum):
     CRITICAL = 1
@@ -149,7 +169,7 @@ class Owner(commands.Cog):
       @commands.command(name="cogs")
       @commands.is_owner()
       async def _cogs(self, ctx):
-            await ctx.send(Utils.humanize_list(sorted([extension[5:].capitalize() for extension in bot.extensions.keys()])))
+            await ctx.send(utils.humanize_list(sorted([extension[5:].capitalize() for extension in bot.extensions.keys()])))
 
       @commands.command(name="shutdown")
       @commands.is_owner()
@@ -158,6 +178,8 @@ class Owner(commands.Cog):
             with contextlib.suppress(discord.HTTPException):
                   if not silently:
                         await ctx.send("Shutting down...")
+            with open("prefixes.json", "w") as j:
+                  json.dump(bot.guild_prefixes, j, indent=6)
             await self.bot.logout()
             sys.exit(ExitCodes.SHUTDOWN)
 
@@ -168,6 +190,8 @@ class Owner(commands.Cog):
             with contextlib.suppress(discord.HTTPException):
                   if not silently:
                         await ctx.send("Attempting Restart...")
+            with open("prefixes.json", "w") as j:
+                  json.dump(bot.guild_prefixes, j, indent=6)
             await self.bot.logout()
             sys.exit(ExitCodes.RESTART)
 
@@ -186,7 +210,7 @@ class Owner(commands.Cog):
                   except Exception as e:
                         errors.append(e)
             if reloaded_cogs is not None and len(reloaded_cogs) > 0:
-                  reloaded_cogs = Utils.humanize_list(reloaded_cogs)
+                  reloaded_cogs = utils.humanize_list(reloaded_cogs)
                   await ctx.send(f"Reloaded: {reloaded_cogs}")
             if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
@@ -205,7 +229,7 @@ class Owner(commands.Cog):
                         loaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            loaded_cogs = Utils.humanize_list(loaded_cogs)
+            loaded_cogs = utils.humanize_list(loaded_cogs)
             if loaded_cogs is not None and len(loaded_cogs) > 0:
                   await ctx.send(f"Loaded: {loaded_cogs}")
             if errors is not None and len(errors) > 0:
@@ -225,7 +249,7 @@ class Owner(commands.Cog):
                         unloaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            unloaded_cogs = Utils.humanize_list(unloaded_cogs)
+            unloaded_cogs = utils.humanize_list(unloaded_cogs)
             if unloaded_cogs is not None and len(unloaded_cogs) > 0:
                   await ctx.send(f"Unloaded: {unloaded_cogs}")
             if errors is not None and len(errors) > 0:
