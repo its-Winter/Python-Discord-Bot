@@ -1,4 +1,5 @@
 import sqlite3
+import sqlalchemy
 import discord
 from discord.ext import commands
 from typing import (
@@ -6,11 +7,16 @@ from typing import (
       Union,
       Sequence
 )
+from cogs.utils import (
+      get_members,
+)
 
 class Config(commands.Cog):
       
       def __init__(self, bot):
             self.bot = bot
+            self.db = sqlalchemy.create_engine('sqlite:///:memory:', echo=True)
+            self.db = self.db.connect()
 
       def get_config(self, table: str, id: int) -> list:
             sql = f"""SELECT * FROM {table} WHERE user_id={id}"""
@@ -18,6 +24,10 @@ class Config(commands.Cog):
                   cursor = db.cursor()
                   cursor.execute(sql)
                   results = cursor.fetchall()
+      
+            # fetch = "SELECT * FROM :table WHERE user_id = :id"
+            # result = self.db.execute(fetch)
+            # result = result.fetchone()
             
             return results
 
@@ -30,16 +40,12 @@ class Config(commands.Cog):
       
       @_config.command(name="fetchuser", aliases=["userfetch"])
       @commands.guild_only()
-      async def _user_fetch(self, ctx, user: Optional[Union[discord.User, int, str]] = None):
+      async def _user_fetch(self, ctx: commands.Context, user: Optional[Union[discord.User, int, str]] = None):
             """testing databse stuff"""
             if user is None:
                   return await ctx.send("Nobody entered.")
-            elif isinstance(user, discord.User):
-                  fetched_user = user
-            elif isinstance(user, str):
-                  fetched_user = ctx.guild.get_member_named(str(user))
-            elif isinstance(user, int):
-                  fetched_user = ctx.bot.fetch_user(int(user))
+            else:
+                  fetched_user = get_members(ctx, user)
 
             if fetched_user is None:
                   return await ctx.send(f"Failed to find {user}")

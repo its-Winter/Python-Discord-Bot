@@ -1,60 +1,43 @@
 import discord
 from discord.ext import commands
-from discord.ext.commands import context, errors
-from discord.ext.commands import core
 import contextlib
-import os, sys
+import os
+import sys
 import json
 import platform
-import asyncio
-import arrow
 import logging
-import sqlite3
+import asyncio
+import DiscordUtils
 from enum import IntEnum
-from typing import Optional
-from cogs.utils import utils
+from typing import (
+      Optional,
+      List
+)
+from collections import defaultdict
+from datetime import datetime
+from cogs.utils import (
+      humanize_list,
+      get_local_time
+)
 
 # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 # filehandler = logging.FileHandler(filename='Discord.log', mode='a', encoding='utf-8')
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s :: %(message)s')
 
-
 with open('settings.json', 'r') as j:
       settings = json.load(j)
 
-if settings["prefix"] is None:
-      choice = ""
-      print("There is no prefix set, what would you like to make it? One character allowed.")
-      while len(choice) != 1:
-            choice = input("> ")
-            if len(choice) != 1:
-                  print(f"'{choice}' is not a valid prefix, try again.")
-                  continue
-
-      settings["prefix"] = str(choice)
-
-      with open('settings.json', 'w') as j:
-            json.dump(settings, j, indent=6)
-
-if settings["token"] is None:
-      choice = ""
-      print("There is no token set in settings. Please give a token to use.")
-      while len(choice) < 50:
-            choice = input("> ")
-            if len(choice) < 50:
-                  print(f"Invalid token: '{choice}'")
-                  continue
-
-      settings["token"] = str(choice)
-
-      with open('settings.json', 'w') as j:
-            json.dump(settings, j, indent=6)
-
-# async with sqlite3.connect('main.db') as db:
-#       with db.cursor() as cursor:
-#             cursor.execute("SELECT 'token' FROM 'bot config'")
-
 desc = "I'm {bot name here}! Originally a project to learn python from scratch, and soon to be fully public!"
+
+
+class Context(commands.Context):
+      def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            pass
+
+      def start_deleting_messages(self, messages: List[discord.Message]):
+            pass
+
 
 class Bot(commands.bot.AutoShardedBot):
 
@@ -62,13 +45,16 @@ class Bot(commands.bot.AutoShardedBot):
             super().__init__(*args, **kwargs)
             self.load_after_ready = ["audio", "wolfpack", "specific"]
             with open("prefixes.json", "r") as j:
-                  self.guild_prefixes = json.load(j)
+                  prefixes = json.load(j)
+                  self.guild_prefixes = defaultdict(dict)
+                  self.guild_prefixes = prefixes
+            self.regex_words = {}
 
       def load_cogs(self, cogs: Optional[list] = None):
             """loads cogs"""
             loaded = []
             errors = []
-            ignore = ["utils", "auditlogs"]
+            ignore = ["utils", "auditlogs", "help", "wolfpack"]
             if not cogs:
                   cogs = [cog[:-3] for cog in os.listdir("cogs") if cog.endswith("py")]
                   for filename in cogs:
@@ -90,9 +76,8 @@ class Bot(commands.bot.AutoShardedBot):
                               loaded.append(cog)
                         except Exception as e:
                               errors.append(f"{type(e).__name__}: {e}")
-            
 
-            loaded = utils.humanize_list(loaded)
+            loaded = humanize_list(loaded)
             print(f"Loaded: {loaded}")
             if len(errors) > 0:
                   print(f"Errors: {errors}")
@@ -109,12 +94,17 @@ async def get_prefix(bot, message):
             prefixes.append(".")
       return prefixes
 
-bot = Bot(command_prefix=get_prefix, description=desc, case_insensitive=True, owner_id=settings["ownerid"])
+intents = discord.Intents(guilds=True, members=True, voice_states=True, presences=True, messages=True, reactions=True, typing=True)
+bot = Bot(intents=intents, command_prefix=get_prefix, description=desc, case_insensitive=True, owner_id=settings["ownerid"])
 
 @bot.event
 async def on_ready():
       if not hasattr(bot, "start_time"):
-            bot.start_time = arrow.utcnow()
+            bot.start_time = datetime.utcnow()
+      if not hasattr(bot, "invite_tracker"):
+            bot.invite_tracker = DiscordUtils.InviteTracker(bot)
+      await bot.invite_tracker.cache_invites()
+      print("Cached guild invites")
       bot_appinfo = await bot.application_info()
       bot.invite_url = discord.utils.oauth_url(bot.user.id, permissions=discord.Permissions(permissions=8))
       bot._last_exception = None
@@ -130,9 +120,11 @@ Owner:            {bot_appinfo.owner}
       """
       )
 
+
 @bot.event
 async def on_connect():
       print(f"{bot.user} has been connected to Discord.")
+
 
 @bot.event
 async def on_disconnect():
@@ -140,38 +132,81 @@ async def on_disconnect():
             json.dump(bot.guild_prefixes, j, indent=6)
       print(f"{bot.user} has been disconnected from Discord.")
 
+
 @bot.event
 async def on_resumed():
       print(f"{bot.user} has been reconnected to Discord.")
 
+
 @bot.event
 async def on_command(ctx):
-      msg = f"[{arrow.now('US/Eastern').strftime('%x %X')}] {ctx.author} called {ctx.message.content}"
+      if ctx.command.name == "eval":
+            asyncio.sleep(0.5)
+      msg = f"[{get_local_time().strftime('%x %X')}] {ctx.author} called {ctx.message.content}"
       if ctx.guild is None:
             msg += " in DMs"
       else:
             msg += f" in {ctx.guild.name}"
       print(msg)
 
+
 @bot.event
-async def on_error(error, *args, **kwargs):
-      bot._last_exception = error
+async def on_message(message: discord.Message):
+      if message.guild is None:
+            print(f"{message.author} used dm'd {message.content}")
+            return
+      regex = []
+      for word in bot.regex_words.keys():
+            regex.append(str(word))
+      for word in regex:
+            pass
+      if bot.user.mention in message.content:
+            guild_prefixes = await get_prefix(bot, message)
+            if isinstance(guild_prefixes, list):
+                  while "." in guild_prefixes:
+                        guild_prefixes.remove(".")
+            
+            if not guild_prefixes:
+                  msg = "Default Prefix of `.`"
+            else:
+                  msg = f"Guild Prefixes are: {humanize_list([f'`{x}`' for x in guild_prefixes])}"
+            await message.channel.send(msg)
+      await bot.process_commands(message)
+
+# @bot.event
+# async def on_command_error(ctx: commands.Context, error):
+#       e = discord.Embed(title=f"**Error in command {ctx.command}.**", description=f"```py\n{str(errors=error)}```", timestamp=get_time())
+#       await ctx.send(embed=e)
+
+
+# @bot.event
+# async def on_error(error, *args, **kwargs):
+#       bot._last_exception = error
+
 
 class ExitCodes(IntEnum):
     CRITICAL = 1
     SHUTDOWN = 0
     RESTART = 26
 
+
 class Owner(commands.Cog):
       def __init__(self, bot):
             self.bot = bot
 
-      @commands.command(name="cogs")
+      @commands.command(name="cogs", usage=".cogs")
       @commands.is_owner()
-      async def _cogs(self, ctx):
-            await ctx.send(utils.humanize_list(sorted([extension[5:].capitalize() for extension in bot.extensions.keys()])))
+      async def _cogs(self, ctx: commands.Context):
+            all_cogs = [cog[:-3].capitalize() for cog in os.listdir("cogs") if cog.endswith("py")]
+            loaded = sorted([extension[5:].capitalize() for extension in bot.extensions.keys()])
+            unloaded = [cog for cog in all_cogs if cog not in loaded]
+            loaded, unloaded = humanize_list(loaded), humanize_list(unloaded)
 
-      @commands.command(name="shutdown")
+            msg = f"Loaded: {loaded}\nUnloaded: {unloaded}"
+            await ctx.send(msg)
+
+
+      @commands.command(name="shutdown", usage=".shutdown")
       @commands.is_owner()
       async def _shutdown(self, ctx, silently = False):
             """Shuts down the bot."""
@@ -183,7 +218,7 @@ class Owner(commands.Cog):
             await self.bot.logout()
             sys.exit(ExitCodes.SHUTDOWN)
 
-      @commands.command(name="restart", aliases=["rs"])
+      @commands.command(name="restart", usage=".restart", aliases=["rs"])
       @commands.is_owner()
       async def _restart(self, ctx, silently = False):
             """Attempts a bot restart."""
@@ -195,7 +230,7 @@ class Owner(commands.Cog):
             await self.bot.logout()
             sys.exit(ExitCodes.RESTART)
 
-      @commands.command(name="reload", aliases=["rl"])
+      @commands.command(name="reload", usage=".reload [cogs]", aliases=["rl"])
       @commands.is_owner()
       async def _reload(self, ctx, *cogs: str):
             """Reload cogs."""
@@ -210,12 +245,12 @@ class Owner(commands.Cog):
                   except Exception as e:
                         errors.append(e)
             if reloaded_cogs is not None and len(reloaded_cogs) > 0:
-                  reloaded_cogs = utils.humanize_list(reloaded_cogs)
+                  reloaded_cogs = humanize_list(reloaded_cogs)
                   await ctx.send(f"Reloaded: {reloaded_cogs}")
             if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
 
-      @commands.command(name="load")
+      @commands.command(name="load", usage=".load [cogs]")
       @commands.is_owner()
       async def _load(self, ctx, *cogs: str):
             """Loads cogs."""
@@ -229,13 +264,13 @@ class Owner(commands.Cog):
                         loaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            loaded_cogs = utils.humanize_list(loaded_cogs)
+            loaded_cogs = humanize_list(loaded_cogs)
             if loaded_cogs is not None and len(loaded_cogs) > 0:
                   await ctx.send(f"Loaded: {loaded_cogs}")
             if errors is not None and len(errors) > 0:
                   await ctx.send("Errors: {}".format(errors))
 
-      @commands.command(name="unload")
+      @commands.command(name="unload", usage=".unload [cogs]")
       @commands.is_owner()
       async def _unload(self, ctx, *cogs: str):
             """Unload cogs."""
@@ -249,11 +284,12 @@ class Owner(commands.Cog):
                         unloaded_cogs.append(cog.capitalize())
                   except Exception as e:
                         errors.append(e)
-            unloaded_cogs = utils.humanize_list(unloaded_cogs)
+            unloaded_cogs = humanize_list(unloaded_cogs)
             if unloaded_cogs is not None and len(unloaded_cogs) > 0:
                   await ctx.send(f"Unloaded: {unloaded_cogs}")
             if errors is not None and len(errors) > 0:
                   await ctx.send(f"Errors: {errors}")
+
 
 try:
       bot.add_cog(Owner(bot))

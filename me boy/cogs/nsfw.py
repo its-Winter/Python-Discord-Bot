@@ -2,7 +2,7 @@ import discord
 import aiohttp
 import asyncio
 from discord.ext import commands
-from cogs.utils import utils
+from cogs.utils import nsfw_only
 
 valid_neko_args = [
       "anal",
@@ -14,6 +14,7 @@ valid_neko_args = [
       "hentai",
       "pgif",
 ]
+
 
 class NSFW(commands.Cog):
 
@@ -30,7 +31,7 @@ class NSFW(commands.Cog):
                   res = await res.json()
             return res.get("message")
 
-      @utils.nsfw_only()
+      @nsfw_only()
       @commands.group(name="nsfw", invoke_without_command=True)
       @commands.cooldown(2, 5, commands.BucketType.user)
       async def _nsfw(self, ctx, requested: str):
@@ -48,7 +49,7 @@ class NSFW(commands.Cog):
             else:
                   await ctx.send_help(ctx.command)
 
-      @utils.nsfw_only()
+      @nsfw_only()
       @_nsfw.command(name="bomb")
       async def _nsfw_bomb(self, ctx, imgtype: str):
             for x in range(1, 6):
@@ -59,6 +60,7 @@ class NSFW(commands.Cog):
                   em.set_footer(text="Powered by Nekobot api.", icon_url=ctx.author.avatar_url)
 
                   await ctx.send(embed=em)
+
 
 def setup(bot):
       bot.add_cog(NSFW(bot))

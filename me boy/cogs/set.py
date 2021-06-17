@@ -143,9 +143,10 @@ class Set(commands.Cog):
             status = self.bot.guilds[0].me.status if len(self.bot.guilds) > 0 else None
             if stream_title:
                   stream_title = stream_title.strip()
+                  past_streamer_name = streamer
                   if "twitch.tv/" not in streamer:
                         streamer = "https://twitch.tv/" + streamer
-                  activity = discord.Streaming(url=streamer, name=stream_title)
+                  activity = discord.Streaming(url=streamer, name=stream_title, platform="Twitch", twitch_name=past_streamer_name)
                   await self.bot.change_presence(status=status, activity=activity)
             elif streamer is not None:
                   await ctx.send(f"Failed to provide a stream title.")

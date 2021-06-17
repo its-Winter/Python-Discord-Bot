@@ -11,7 +11,8 @@ with open('settings.json', 'r') as j:
 TWITCH_API = settings["apis"]["twitch"]
 TWITCH_BASE_URL = "https://twitch.tv/"
 
-class Twitch_Cog(commands.Cog):
+
+class Twitch(commands.Cog):
       
       def __init__(self, bot):
             self.bot = bot
@@ -25,7 +26,7 @@ class Twitch_Cog(commands.Cog):
       async def _get_twitch_stream(self, ctx, user: str):
             twitch_stream = await self.twitch_api.get_stream(user)
             twitch_users = await self.twitch_api.get_users(user)
-            twitch_user = twitch_users[0]
+            twitch_user = twitch_users[0] if twitch_users else None
             if not twitch_stream and twitch_user:
                   await ctx.send(f"{twitch_user.display_name} is not live.")
                   return
@@ -44,7 +45,5 @@ class Twitch_Cog(commands.Cog):
             await ctx.send(embed=embed)
 
 
-
-
 def setup(bot):
-      bot.add_cog(Twitch_Cog(bot))
+      bot.add_cog(Twitch(bot))

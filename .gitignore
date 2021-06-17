@@ -10,3 +10,7 @@ me boy/cogs/__pycache__
 .vscode
 .vs
 me boy/Discord.log
+me boy/main.db
+me boy/Start.ps1
+me boy/Start.ps1
+*.ps1

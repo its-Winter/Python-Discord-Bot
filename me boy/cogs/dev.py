@@ -11,13 +11,26 @@ import io
 import traceback
 from discord.ext import commands
 from discord.ext.commands import core
-from cogs.utils import utils
+from discord.ext.commands.converter import Greedy
+from cogs.utils import (
+      pagify,
+      box,
+      hastepaste,
+      bordered,
+      whitelisted_users,
+)
+from typing import (
+      Optional,
+      Any,
+      Union
+)
 from contextlib import redirect_stdout
 from asyncio.subprocess import PIPE, STDOUT
 from subprocess import Popen
 from time import time
 
 START_CODE_BLOCK_RE = re.compile(r"^((```py)(?=\s)|(```))")
+
 
 class Dev(commands.Cog):
       def __init__(self, bot):
@@ -56,27 +69,52 @@ class Dev(commands.Cog):
             Returns a string representation of the error formatted as a codeblock.
             """
             if e.text is None:
-                  return utils.box("{0.__class__.__name__}: {0}".format(e), lang="py")
-            return utils.box(
+                  return box("{0.__class__.__name__}: {0}".format(e), lang="py")
+            return box(
                   "{0.text}\n{1:>{0.offset}}\n{2}: {0}".format(e, "^", type(e).__name__), lang="py"
             )
+
+      @commands.command(name="fetchmsg",
+                        usage=".fetchmsg <guild_id> <channel_id> <message_id>",
+                        description="guild_id: the guild's id to search for, deafults to current guild,\nchannel_id: the channel to look in for the message.")
+      @commands.is_owner()
+      async def _fetch_message(self, ctx: commands.Context, guild_id: int = None, channel_id: int = None, msg_id: Greedy[float] = None):
+            if not isinstance(msg_id, int):
+                  await ctx.send("not an integer.", type(msg_id))
+                  try:
+                        msg_id = int(msg_id)
+                  except:
+                        return
+            if guild_id is None:
+                  guild_id = ctx.guild.id
+            if channel_id is None:
+                  channel_id = ctx.channel.id
+
+
+            guild = ctx.bot.get_guild(guild_id)
+            channel = guild.get_channel(channel_id)
+            msg = await channel.fetch_message(msg_id)
+            await ctx.send(msg)
 
       @commands.command(name="border")
       @commands.guild_only()
       async def _border_ig(self, ctx, *columns, ascii_border: bool = True):
-            result = utils.bordered(*columns, ascii_border=ascii_border)
-            await ctx.send(utils.box(result))
+            result = bordered(*columns, ascii_border=ascii_border)
+            await ctx.send(box(result))
 
       @commands.command(name="test")
-      @utils.is_allowed(261401343208456192)
-      async def only_germ(self, ctx):
-            await ctx.send(f"fuck you too {ctx.author.mention}")
-
+      @whitelisted_users(261401343208456192)
+      async def only_germ(self, ctx, arg: Union[int, float, str] = None):
+            if arg is None:
+                  await ctx.send("Nothing")
+            
+            await ctx.send(type(arg))
+      
       @commands.command(name="source")
       @commands.is_owner()
-      async def _source(self, ctx, *, command: str):
-            """ Shows the source code of a command. """
-            cmd = self.bot.get_command(command)
+      async def _source(self, ctx: commands.Context, *, command: str):
+            """ Shows the source code of a command."""
+            cmd = ctx.bot.get_command(command)
 
             if not cmd:
                   return await ctx.send('No command with that name exists.')
@@ -84,10 +122,10 @@ class Dev(commands.Cog):
             source = inspect.getsource(cmd.callback)
 
             if len(source) > 1990:
-                  paste = await utils.hastepaste(source)
+                  paste = await hastepaste(source)
                   await ctx.send(f'Source too big, uploaded to HastePaste: <{paste}>')
             else:
-                  await ctx.send(utils.box(source, lang="py"))
+                  await ctx.send(box(source, lang="py"))
 
       @commands.command(name="eval")
       @commands.is_owner()
@@ -143,7 +181,6 @@ class Dev(commands.Cog):
                   printed = "{}{}".format(stdout.getvalue(), traceback.format_exc())
             else:
                   printed = stdout.getvalue()
-                  await ctx.tick()
 
             if result is not None:
                   self._last_result = result
@@ -152,8 +189,8 @@ class Dev(commands.Cog):
                   msg = printed
             msg = self.sanitize_output(ctx, msg)
 
-            for page in utils.pagify(msg):    
-                  await ctx.send(utils.box(page, lang="py"))
+            for page in pagify(msg):
+                  await ctx.send(box(page, lang="py"))
 
       @commands.command(aliases=["shell"])
       @commands.is_owner()
@@ -163,7 +200,44 @@ class Dev(commands.Cog):
             out = await proc.stdout.read()
             msg = out.decode('utf-8')
             await ctx.send(f"```ini\n\n[Command Prompt Input]: {arg}\n```")
-            await ctx.send(utils.box(msg, lang="cmd"))
+            for page in pagify(msg):
+                  await ctx.send(box(page, lang="cmd"))
+
+      @commands.command(name="stats")
+      async def stats(self, ctx: commands.Context):
+            db = sqlite3.connect('main.sqlite')
+            cursor = db.cursor()
+            value = (ctx.guild.id)
+            cursor.execute(f"select category_id FROM test WHERE guild_id = ?", value)
+            result = cursor.fetchone()
+            overwrites = {
+                  ctx.guild.default_role: discord.PermissionOverwrite(connect=False),
+                  ctx.guild.me: discord.PermissionOverwrite(connect=True),
+            }
+
+            data = dict(
+                  Members = len(ctx.guild.members), 
+                  Text_Channels = len(ctx.guild.text_channels),
+                  Voice_Channels = len(ctx.guild.voice_channels),
+                  Roles = len(filter(lambda x: not x.managed, ctx.guild.roles)) - 1, # should ignore the integrated roles imo and the @everyone role.
+                  Users = len(filter(lambda x: not x.bot, ctx.guild.members)),
+                  Bots = len(filter(lambda x: x.bot, ctx.guild.members)),
+            )
+            
+            if result is not None:
+                  category = discord.utils.get(ctx.guild.categories, id=int(result))
+            if category is None:
+                  category = await ctx.guild.create_category("Server Stats", overwrites=overwrites, position=0)
+                  for channel, value in data.items():
+                        await category.create_voice_channel(f"{channel.replace('_', ' ')}: {value}")
+
+            else:
+                  for channel in category.voice_channels:
+                        channel_name = channel.name.split(":")[0]
+                        channel_name.replace(" ", "_")
+                        if channel_name in data.keys():
+                              await channel.edit(name=f"{channel_name.replace('_', ' ')}: {data[channel_name]}")
+
 
 def setup(bot):
       bot.add_cog(Dev(bot))

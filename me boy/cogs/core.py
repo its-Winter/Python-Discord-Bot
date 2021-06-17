@@ -13,12 +13,21 @@ from datetime import datetime
 from discord import utils
 from discord.ext import commands
 from discord.ext.commands import errors, core
-from cogs.utils import utils
+from cogs.utils import (
+      bold,
+      humanize_list,
+      box,
+      pagify,
+      get_members,
+      botuptime,
+      get_local_time,
+      humanize_timedelta,
+)
 
 corelog = logging.getLogger('Core')
 corelog.setLevel(logging.INFO)
-
 urlreg = re.compile(r"https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+")
+
 
 class Core(commands.Cog):
       def __init__(self, bot):
@@ -36,21 +45,21 @@ class Core(commands.Cog):
       @commands.bot_has_guild_permissions(embed_links=True)
       async def _headpat(self, ctx: commands.Context):
             color = discord.Colour.from_rgb(254, 222, 214)
-            time = datetime.now()
-            e = discord.Embed(color=color, title=f"{ctx.author.name} headpat now!")
+            time = datetime.utcnow()
+            e = discord.Embed(color=color, title=f"{ctx.author.name} headpat now!", timestamp=get_local_time())
             e.set_image(url="https://cdn.discordapp.com/attachments/461381136661217283/711845948455780402/headpat_her.png")
             e.set_footer(text=f"{time.strftime('%H:%M')} EST")
             await ctx.send(embed=e)
 
       @commands.command(name="welcome", hidden=True)
       @commands.guild_only()
-      async def _welcome(self, ctx, *, users: Optional[Union[List[discord.User], List[str]]] = None):
+      async def _welcome(self, ctx, *users: List[discord.Member]):
             """A basic welcome command"""
             if not users:
                   return await ctx.send(f"Welcome {ctx.author.mention} to {ctx.guild.name}!")
             else:
                   if len(users) > 1:
-                        users = utils.humanize_list(users)
+                        users = humanize_list(users)
                   else:
                         users = users[0].mention
                   await ctx.send(f"Welcome {users} to {ctx.guild.name}!")
@@ -66,32 +75,30 @@ class Core(commands.Cog):
                   destination = ctx.channel
 
             if self.bot._last_exception:
-                  for page in utils.pagify(self.bot._last_exception):
-                        await destination.send(utils.box(page, lang="py"))
+                  for page in pagify(self.bot._last_exception):
+                        await destination.send(box(page, lang="py"))
             else:
                   await ctx.send("No exception has occurred yet")
 
       @commands.command(name="avatar", aliases=["av"])
       @commands.bot_has_guild_permissions(embed_links=True)
-      async def _avatar(self, ctx, user: Optional[Union[discord.User, str, int]] = None):
+      async def _avatar(self, ctx, user: Optional[discord.Member]):
             """Show any user's avatar."""
             if not user:
-                  userav = ctx.author
-            else:
-                  userav = utils.get_user(ctx.guild, user)
+                  user = ctx.author
             
-            if userav.is_avatar_animated():
-                  link = userav.avatar_url_as(format='gif', size=1024)
+            if user.is_avatar_animated():
+                  link = user.avatar_url_as(format='gif', size=1024)
             else:
-                  link = userav.avatar_url_as(format='png', size=1024)
+                  link = user.avatar_url_as(format='png', size=1024)
 
-            user_member_color = ctx.guild.get_member(userav.id).top_role.color
+            user_member_color = user.top_role.color
             # e = discord.Embed(color=user_member_color if user_member_color != int('#000000') else discord.Colour.random())
             e = discord.Embed(color=user_member_color)
             e.set_image(url=link)
-            e.set_author(name=f"{userav.name}'s avatar", icon_url=link, url=link)
-            footer = f"{ctx.author.name} wanted to see." if userav != ctx.author else "So you wanted to see yourself, eh?"
-            e.set_footer(text=footer, icon_url=ctx.author.avatar_url if userav.id != ctx.author.id else "")
+            e.set_author(name=f"{user.name}'s avatar", icon_url=link, url=link)
+            footer = f"{ctx.author.name} wanted to see." if user != ctx.author else "So you wanted to see yourself, eh?"
+            e.set_footer(text=footer, icon_url=ctx.author.avatar_url if user.id != ctx.author.id else "")
             await ctx.send(embed=e)
 
       @commands.command(name="germ")
@@ -100,17 +107,17 @@ class Core(commands.Cog):
             """it's a germ!"""
             germ = ctx.bot.get_user(216085324906889226)
             germstime = datetime.now().strftime("%X")
-            e = discord.Embed(title=germ.name, description=f"this is germ: {germ.mention}", color=discord.Color.gold())
+            e = discord.Embed(title=germ.name, description=f"this is germ: {germ.mention}", color=discord.Color.gold(), timestamp=get_local_time())
             e.set_author(name=germ.name, icon_url=germ.avatar_url)
-            e.set_footer(text=f"{ctx.author.name} has asked about Germ at {germstime} PST", icon_url=ctx.author.avatar_url)
+            e.set_footer(text=f"{ctx.author.name} has asked about Germ", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=e)
 
       @commands.command(name="uptime")
       async def _uptime(self, ctx):
             """Shows bot's uptime since last startup."""
             async with ctx.typing():
-                  uptimestr = utils.botuptime(ctx.bot)
-                  e = discord.Embed(description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green())
+                  uptimestr = botuptime(ctx.bot)
+                  e = discord.Embed(description=f"{ctx.bot.user.mention} has been online for ```{uptimestr}.```", color=discord.Color.green(), timestamp=get_local_time())
                   e.set_author(name="Uptime", icon_url=ctx.bot.user.avatar_url)
                   e.set_footer(text=f"summoned by {ctx.author}", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=e)
@@ -128,7 +135,7 @@ class Core(commands.Cog):
       async def _ping(self, ctx):
             """Check bot's API latency and discord typing latency."""
             latency = self.bot.latency * 1000
-            e = discord.Embed(title="Pong.", color=discord.Color.red())
+            e = discord.Embed(title="Pong.", color=discord.Color.red(), timestamp=get_local_time())
             e.add_field(name="Discord API", value=f"```{str(round(latency))} ms```")
             e.add_field(name="Typing", value="```calculating ms```")
 
@@ -172,7 +179,7 @@ class Core(commands.Cog):
             channel = "\n".join(channel)
             inviter = "\n".join(inviter)
 
-            e = discord.Embed(color=ctx.guild.me.top_role.color)
+            e = discord.Embed(color=ctx.guild.me.top_role.color, timestamp=get_local_time())
             e.set_author(name=f"{guild.name}'s invites")
             e.set_thumbnail(url=guild.icon_url)
             e.add_field(name="Invites", value=invitecodes)
@@ -183,29 +190,27 @@ class Core(commands.Cog):
 
       @commands.command(name="dm")
       @commands.guild_only()
-      async def _dm(self, ctx, user: Union[discord.User, str], *, message: Optional[str] = None):
+      async def _dm(self, ctx, user: discord.Member, *, message: Optional[str] = None):
             """Direct message a user from the bot."""
             if user is None:
                   await ctx.send("Provided no user to search for.")
                   return
-            else:
-                  user = utils.get_user(ctx.guild, user)
 
-            if user.bot is True:
-                  await ctx.send("I cannot send messages to other bots pandejo.")
+            if user.bot:
+                  await ctx.send("I cannot send messages to other bots.")
                   return
 
             try:
                   urls = re.findall(urlreg, message)
             except TypeError:
                   urls = None
-            e = discord.Embed(description=message, color=discord.Colour.blurple())
+            e = discord.Embed(description=message, color=discord.Colour.blurple(), timestamp=get_local_time())
             attachment = ctx.message.attachments[0] if len(ctx.message.attachments) > 0 else None
             if urls or attachment:
                   e.set_image(url=attachment.url if attachment else urls[0])
             
             e.set_author(name=f"Message from {ctx.author}!", icon_url=ctx.author.avatar_url)
-            e.set_footer(text=f"Sent at {datetime.now().strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
+            e.set_footer(icon_url=ctx.bot.user.avatar_url)
             
             try:
                   await user.send(embed=e)
@@ -215,7 +220,7 @@ class Core(commands.Cog):
 
       @commands.command(name="dmid", hidden=True)
       async def _dmid(self, ctx, user: int, message: str):
-            user = await utils.fetch_user(self.bot, user)
+            user = await get_members(ctx, user)
             try:
                   await user.send(message)
                   await ctx.send(f"Sent message to {user.name}")
@@ -224,43 +229,38 @@ class Core(commands.Cog):
 
       @commands.command(name="anondm")
       @commands.guild_only()
-      async def _anon_dm(self, ctx, user: Union[discord.User, str], *, message: Optional[str] = None):
+      async def _anon_dm(self, ctx, user: discord.Member, *, message: Optional[str] = None):
             """Direct message a user from the bot."""
             if user is None:
                   await ctx.send("Provided no user to search for.")
                   return
-            else:
-                  user_found = utils.get_user(ctx.guild, user)
 
-            if user_found is None:
-                  await ctx.send(f"No user found with `{user}`")
-
-            if user_found.bot is True:
+            if user.bot:
                   await ctx.send("I cannot send messages to other bots.")
                   return
 
-            if ctx.channel.permissions_for(user_found).read_messages:
+            if ctx.channel.permissions_for(user).read_messages:
                   delete = True # await ctx.message.delete()
 
             try:
                   urls = re.findall(urlreg, message)
             except TypeError:
                   urls = None
-            e = discord.Embed(description=message, color=discord.Colour.blurple())
+            e = discord.Embed(description=message, color=discord.Colour.blurple(), timestamp=get_local_time())
             attachment = ctx.message.attachments[0] if len(ctx.message.attachments) > 0 else None
             if urls or attachment:
                   e.set_image(url=attachment.url if attachment else urls[0])
 
+            e.set_author(name=f"Message from {ctx.guild}...", icon_url=ctx.guild.icon_url)
+            e.set_footer(icon_url=ctx.bot.user.avatar_url)
+
             try:
-                  e.set_author(name=f"Message from {ctx.guild}...", icon_url=ctx.guild.icon_url)
-                  e.set_footer(text=f"Sent at {datetime.now().strftime('%X')} EST", icon_url=ctx.bot.user.avatar_url)
-                  await user_found.send(embed=e)
-                  await ctx.send(f"Sent your message to {user_found.display_name}.", delete_after=5 if delete else None)
+                  await user.send(embed=e)
+                  await ctx.send(f"Sent your message to {user.display_name}.", delete_after=5 if delete else None)
                   if delete:
                         await ctx.message.delete()
             except Exception as e:
-                  await ctx.send(f"Failed to send message to {user_found}. {e}")
-
+                  await ctx.send(f"Failed to send message to {user}. {e}")
 
       @commands.command(name="guilds", aliases=["servers"])
       @commands.is_owner()
@@ -291,7 +291,7 @@ class Core(commands.Cog):
             def pred2(m):
                   return True if m.author == ctx.author and m.content == "yes" else False
             try:
-                  pred = await self.bot.wait_for("message", check=pred2, timeout=15)
+                  pred = await ctx.bot.wait_for("message", check=pred2, timeout=15)
                   if pred.result is True:
                         await guild.leave()
                   if guild != ctx.guild:
@@ -307,27 +307,17 @@ class Core(commands.Cog):
       @commands.guild_only()
       async def _serverinfo(self, ctx, details: bool = True):
             """Get server information in a fancy embed."""
-            # if not id:
-            #       guild = ctx.guild
-            # else:
-            #       try:
-            #             guild = ctx.bot.get_guild(int(id))
-            #             if not guild:
-            #                   guild = await ctx.bot.fetch_guild(int(id))
-            #       except Exception as e:
-            #             await ctx.send(f"Error: {e}")
-
             guild = ctx.guild
             online = len([m.status for m in guild.members if m.status != discord.Status.offline])
             if not details:
                   desc = "Created at {date}".format(date=guild.created_at.strftime("%d %b %Y %H:%M"))
-                  data = discord.Embed(color=ctx.guild.me.top_role.color, description=desc)
+                  data = discord.Embed(color=ctx.guild.me.top_role.color, description=desc, timestamp=get_local_time())
                   data.set_author(name=guild.name)
                   data.set_thumbnail(url=guild.icon_url)
-                  data.add_field(name="Region", value=utils.bold(guild.region))
-                  data.add_field(name="Users Online", value=utils.bold(f"{online}/{guild.member_count}"))
-                  data.add_field(name="Roles", value=utils.bold(len(guild.roles)))
-                  data.add_field(name="Owner", value=utils.bold(str(guild.owner)))
+                  data.add_field(name="Region", value=bold(guild.region))
+                  data.add_field(name="Users Online", value=bold(f"{online}/{guild.member_count}"))
+                  data.add_field(name="Roles", value=bold(len(guild.roles)))
+                  data.add_field(name="Owner", value=bold(str(guild.owner)))
                   data.set_footer(text=f"ID: {guild.id}")
 
             else:
@@ -384,7 +374,7 @@ class Core(commands.Cog):
                               print(error)
                               continue
                         else:
-                              member_msg += f"{emoji} {utils.bold(num)} " + (
+                              member_msg += f"{emoji} {bold(num)} " + (
                                     "\n" if count % 2 == 0 else ""
                               )
                         count += 1
@@ -450,7 +440,7 @@ class Core(commands.Cog):
                   )
                   data = discord.Embed(
                         description=(f"{guild.description}\n\n" if guild.description else "") + created_at,
-                        colour=discord.Colour.random(),
+                        colour=discord.Colour.blurple(),
                   )
                   data.set_author(
                         name=guild.name,
@@ -468,17 +458,17 @@ class Core(commands.Cog):
                         value= (
                               "\N{SPEECH BALLOON} Text: {text}\n"
                               "\N{SPEAKER WITH THREE SOUND WAVES} Voice: {voice}"
-                        ).format(text=utils.bold(text_channels), voice=utils.bold(voice_channels)),
+                        ).format(text=bold(text_channels), voice=bold(voice_channels)),
                   )
                   data.add_field(
                         name="Utility:",
                         value=(
                           "Owner: {owner}\nVoice region: {region}\nVerif. level: {verif}\nServer ID: {id}{shard_info}"
                         ).format(
-                              owner=utils.bold(str(guild.owner)),
-                              region=utils.bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
-                              verif=utils.bold(verif[str(guild.verification_level)]),
-                              id=utils.bold(str(guild.id)),
+                              owner=bold(str(guild.owner)),
+                              region=bold(f"{vc_regions.get(str(guild.region)) or str(guild.region)}"),
+                              verif=bold(verif[str(guild.verification_level)]),
+                              id=bold(str(guild.id)),
                               shard_info=shard_info,
                         ),
                         inline=False,
@@ -488,12 +478,12 @@ class Core(commands.Cog):
                         value=(
                               "AFK channel: {afk_chan}\nAFK timeout: {afk_timeout}\nCustom emojis: {emoji_count}\nRoles: {role_count}"
                         ).format(
-                              afk_chan=utils.bold(str(guild.afk_channel))
+                              afk_chan=bold(str(guild.afk_channel))
                               if guild.afk_channel
-                              else utils.bold("Not Set"),
-                              afk_timeout=utils.bold(guild.afk_timeout),
-                              emoji_count=utils.bold(len(guild.emojis)),
-                              role_count=utils.bold(len(guild.roles)),
+                              else bold("Not Set"),
+                              afk_timeout=bold(guild.afk_timeout),
+                              emoji_count=bold(len(guild.emojis)),
+                              role_count=bold(len(guild.roles)),
                         ),
                         inline=False,
                   )
@@ -506,11 +496,11 @@ class Core(commands.Cog):
                               "Emoji limit: {emojis_limit}\n"
                               "VCs max bitrate: {bitrate}"
                         ).format(
-                              boostlevel=utils.bold(str(guild.premium_tier)),
-                              nitroboosters=utils.bold(guild.premium_subscription_count),
-                              filelimit=utils.bold(_size(guild.filesize_limit)),
-                              emojis_limit=utils.bold(str(guild.emoji_limit)),
-                              bitrate=utils.bold(_bitsize(guild.bitrate_limit)),
+                              boostlevel=bold(str(guild.premium_tier)),
+                              nitroboosters=bold(guild.premium_subscription_count),
+                              filelimit=bold(_size(guild.filesize_limit)),
+                              emojis_limit=bold(str(guild.emoji_limit)),
+                              bitrate=bold(_bitsize(guild.bitrate_limit)),
                         )
                         data.add_field(name="Nitro Boost:", value=nitro_boost)
                   if guild.splash:
@@ -518,12 +508,11 @@ class Core(commands.Cog):
                         data.set_footer(text=joined_on)
 
             await ctx.send(embed=data)
-      
-      
+
       @commands.command(name="userinfo", aliases=["uinfo"])
       @commands.guild_only()
       @commands.bot_has_permissions(embed_links=True)
-      async def userinfo(self, ctx, *, user: discord.Member = None):
+      async def userinfo(self, ctx: commands.Context, *, user: discord.Member = None):
             """Show information about a user.
             This includes fields for status, discord join date, server
             join date, voice state and previous names/nicknames.
@@ -535,29 +524,26 @@ class Core(commands.Cog):
 
             if not user:
                   user = author
-            else:
-                  user = await utils.get_user(ctx.guild, user)
-
-            #  A special case for a special someone :^)
-            special_date = datetime(2016, 1, 10, 6, 8, 4, 443000)
-            is_special = user.id == 96130341705637888 and guild.id == 133049272517001216
 
             roles = user.roles[-1:0:-1]
 
-            joined_at = user.joined_at if not is_special else special_date
-            since_created = (ctx.message.created_at - user.created_at).days
+            joined_at = user.joined_at
+            since_created = humanize_timedelta(timedelta=ctx.message.created_at - user.created_at)
             if joined_at is not None:
-                  since_joined = (ctx.message.created_at - joined_at).days
+                  since_joined = humanize_timedelta(timedelta=ctx.message.created_at - joined_at)
                   user_joined = joined_at.strftime("%d %b %Y %H:%M")
             else:
                   since_joined = "?"
                   user_joined = "Unknown"
             user_created = user.created_at.strftime("%d %b %Y %H:%M")
             voice_state = user.voice
-            member_number = (
-                  sorted(guild.members, key=lambda m: m.joined_at or ctx.message.created_at).index(user)
-                  + 1
-            )
+            try:
+                  member_number = (
+                        sorted(guild.members, key=lambda m: m.joined_at or ctx.message.created_at).index(user)
+                        + 1
+                  )
+            except ValueError:
+                  member_number = None
 
             created_on = "{}\n({} days ago)".format(user_created, since_created)
             joined_on = "{}\n({} days ago)".format(user_joined, since_joined)
@@ -567,13 +553,12 @@ class Core(commands.Cog):
             elif user.status.name == "online":
                   statusemoji = "\N{LARGE GREEN CIRCLE}"
             elif user.status.name == "offline":
-                  statusemoji = "\N{MEDIUM WHITE CIRCLE}"
+                  statusemoji = "\N{MEDIUM WHITE CIRCLE}\N{VARIATION SELECTOR-16}"
             elif user.status.name == "dnd":
                   statusemoji = "\N{LARGE RED CIRCLE}"
             elif user.status.name == "idle":
                   statusemoji = "\N{LARGE ORANGE CIRCLE}"
             activity = "Chilling in {} status".format(user.status)
-            status_string = self.get_status_string(user)
 
             if roles:
 
@@ -586,8 +571,8 @@ class Core(commands.Cog):
                         # to every single check running on users than the occasional user info invoke
                         # We don't start by building this way, since the number of times we hit this should be
                         # infintesimally small compared to when we don't across all uses of Red.
+
                         continuation_string = "and {numeric_number} more roles not displayed due to embed limits."
-                        
                         available_length = 1024 - len(continuation_string)  # do not attempt to tweak, i18n
 
                         role_chunks = []
@@ -610,19 +595,27 @@ class Core(commands.Cog):
             else:
                   role_str = None
 
-            data = discord.Embed(description=status_string or activity, colour=user.colour)
+            data = discord.Embed(description=activity, colour=user.colour)
 
             data.add_field(name="Joined Discord on", value=created_on)
             data.add_field(name="Joined this server on", value=joined_on)
             if role_str is not None:
-                  data.add_field(name="Roles", value=role_str, inline=False)
-            data.set_footer(text="Member #{} | User ID: {}".format(member_number, user.id))
+                  data.add_field(
+                  name="Roles" if len(roles) > 1 else "Role", value=role_str, inline=False
+                  )
+            if voice_state and voice_state.channel:
+                  data.add_field(
+                  name="Current voice channel",
+                  value="{0.mention} ID: {0.id}".format(voice_state.channel),
+                  inline=False,
+                  )
+            footer = f"Member #{member_number} | User ID: {user.id}" if member_number else f"User ID: {user.id}"
+            data.set_footer(text=footer)
 
             name = str(user)
             name = " ~ ".join((name, user.nick)) if user.nick else name
-            name = utils.filter_invites(name)
 
-            avatar = user.avatar_url_as(static_format="png")
+            avatar = user.avatar_url_as(static_format="png") if not user.is_avatar_animated() else user.avatar_url_as(format="gif")
             data.set_author(name=f"{statusemoji} {name}", url=avatar)
             data.set_thumbnail(url=avatar)
 
@@ -645,12 +638,17 @@ class Core(commands.Cog):
             if not s:
                   s = await ctx.channel.history(limit=1, before=ctx.message.created_at, oldest_first=False).flatten()
                   s = s[0].content
-                        
 
             for pattern, replacement in patterns:
                   s = re.sub(pattern, replacement, s)
 
             await ctx.send(s)
+
+      @commands.command(name="permissions", aliases=["perms"])
+      async def _permissions(self, ctx: commands.Context, person_or_role: Union[discord.Member, discord.Role, int, str]):
+            if not person_or_role:
+                  pass
+
 
 def setup(bot):
       bot.add_cog(Core(bot))

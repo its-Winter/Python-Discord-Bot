@@ -11,7 +11,9 @@ import aiohttp
 import discord
 import lavalink
 from discord.ext import commands
-from cogs.utils import utils
+from cogs.utils import (
+      box,
+)
 from typing import Optional, Union
 
 time_rx = re.compile('[0-9]+')
@@ -78,7 +80,7 @@ class Audio(commands.Cog):
       @commands.is_owner()
       async def _nodes(self, ctx):
             if self.bot.lavalink.node_manager.nodes:
-                  await ctx.send(utils.box(self.bot.lavalink.node_manager.nodes, lang="py"))
+                  await ctx.send(box(self.bot.lavalink.node_manager.nodes, lang="py"))
             else:
                   await ctx.send("There are no nodes.")
 
